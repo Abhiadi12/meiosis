@@ -9,7 +9,7 @@ First off, thank you for considering contributing to meiosis! Contributions are 
 3. **Clone your fork locally**: `git clone https://github.com/YOUR_USERNAME/meiosis.git`
 4. **Install Git hooks** (`make hooks`). They are managed by [lefthook](https://lefthook.dev), a single Go
    binary (installed with `go install` if missing), so no Node toolchain is needed:
-   - `commit-msg`: Conventional Commits, checked by `tools/commitlint` (rules in `.commitlintrc.yaml`)
+   - `commit-msg`: Conventional Commits (scope is optional), checked by `tools/commitlint` (rules in `.commitlintrc.yaml`)
    - `pre-commit`: formats staged Go files (gofumpt and goimports) and checks `go.mod` is tidy
    - `pre-push`: `golangci-lint` (tests run in CI, or with `make test`)
 

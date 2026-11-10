@@ -24,7 +24,7 @@ const (
 	maxBody   = 200
 )
 
-var header = regexp.MustCompile(`^(` + strings.Join(types, "|") + `)(!?)\(([a-z0-9][a-z0-9_./-]*)\)(!?): (.+)$`)
+var header = regexp.MustCompile(`^(` + strings.Join(types, "|") + `)(!?)(?:\(([a-z0-9][a-z0-9_./-]*)\))?(!?): (.+)$`)
 
 // Lint returns every rule the message breaks; none means it is acceptable.
 func Lint(msg string) []string {
@@ -37,7 +37,7 @@ func Lint(msg string) []string {
 	var problems []string
 	m := header.FindStringSubmatch(first)
 	if m == nil {
-		problems = append(problems, "header must be `<type>(<scope>): <subject>` with a scope; types: "+strings.Join(types, ", "))
+		problems = append(problems, "header must be `<type>(<scope>): <subject>` or `<type>: <subject>`; types: "+strings.Join(types, ", "))
 	} else {
 		subject := m[5]
 		if strings.HasSuffix(subject, ".") {

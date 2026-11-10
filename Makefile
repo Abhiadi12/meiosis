@@ -3,7 +3,9 @@
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
-export CGO_ENABLED ?= 0
+# Shipped binaries are built without cgo (pure Go, static). The race detector,
+# unlike the product, needs cgo on Linux, so tests turn it on for themselves.
+NOCGO := CGO_ENABLED=0
 # Tools installed with `go install` live in $(go env GOPATH)/bin, which is often
 # not on PATH: prefer one that is, else look there.
 GOLANGCI_LINT := $(or $(shell command -v golangci-lint),$(shell go env GOPATH)/bin/golangci-lint)
@@ -15,17 +17,17 @@ all: check build ## Everything CI runs, then build
 
 build: ## Build bin/mei and bin/meiosisd
 	@mkdir -p bin
-	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/mei ./cmd/mei
-	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/meiosisd ./cmd/meiosisd
+	$(NOCGO) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/mei ./cmd/mei
+	$(NOCGO) go build -trimpath -ldflags "$(LDFLAGS)" -o bin/meiosisd ./cmd/meiosisd
 
 test: ## Unit and acceptance tests with the race detector
-	go test -race -count=1 ./...
+	CGO_ENABLED=1 go test -race -count=1 ./...
 
 test-short: ## Skip the slow end-to-end suites
 	go test -short ./...
 
 acceptance: ## The exit-criterion walkthrough and adversarial tests against real binaries
-	MEI_REQUIRE_SOCKET_CHECK=1 go test -race -count=1 -v ./internal/acceptance/...
+	MEI_REQUIRE_SOCKET_CHECK=1 CGO_ENABLED=1 go test -race -count=1 -v ./internal/acceptance/...
 
 cover: ## Coverage report in coverage.html
 	go test -count=1 -coverprofile=coverage.out ./...
@@ -65,7 +67,7 @@ vectors: ## Verify the conformance vectors with the independent Python implement
 
 cross: ## Build every release target
 	@for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do \
-	  GOOS=$${t%/*} GOARCH=$${t#*/} go build -o /dev/null ./cmd/... && echo "ok $$t" || exit 1; done
+	  CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build -o /dev/null ./cmd/... && echo "ok $$t" || exit 1; done
 
 vuln: ## Scan dependencies for known vulnerabilities
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
