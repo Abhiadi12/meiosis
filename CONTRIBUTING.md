@@ -11,7 +11,7 @@ First off, thank you for considering contributing to meiosis! Contributions are 
    binary (installed with `go install` if missing), so no Node toolchain is needed:
    - `commit-msg`: Conventional Commits, checked by `tools/commitlint` (rules in `.commitlintrc.yaml`)
    - `pre-commit`: formats staged Go files (gofumpt and goimports) and checks `go.mod` is tidy
-   - `pre-push`: `golangci-lint` and the short test suite
+   - `pre-push`: `golangci-lint` (tests run in CI, or with `make test`)
 
    Skip them in an emergency with `LEFTHOOK=0 git commit ...`; CI runs the same checks.
 5. **Check everything works** (needs `git`, Go, and `golangci-lint`; `lsof` makes the air-gap check run):

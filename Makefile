@@ -4,6 +4,9 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 export CGO_ENABLED ?= 0
+# Tools installed with `go install` live in $(go env GOPATH)/bin, which is often
+# not on PATH: prefer one that is, else look there.
+GOLANGCI_LINT := $(or $(shell command -v golangci-lint),$(shell go env GOPATH)/bin/golangci-lint)
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -36,13 +39,13 @@ bench: ## Benchmarks (workspace fork, and so on)
 	go test ./internal/graph -run '^$$' -bench . -benchmem
 
 lint: ## golangci-lint
-	golangci-lint run
+	$(GOLANGCI_LINT) run
 
 fmt: ## Format the code (gofumpt + goimports, as the linter checks)
-	golangci-lint fmt
+	$(GOLANGCI_LINT) fmt
 
 fmt-check: ## Fail if any file is unformatted
-	golangci-lint fmt --diff
+	$(GOLANGCI_LINT) fmt --diff
 
 vet: ## go vet
 	go vet ./...

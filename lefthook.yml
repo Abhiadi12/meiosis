@@ -1,3 +1,6 @@
+# Tools installed with `go install` live in $(go env GOPATH)/bin, which is often
+# not on PATH, so each command adds it itself.
+#
 # Git hooks (the Go-ecosystem equivalent of husky). Install once with
 # `make hooks`; skip in an emergency with `LEFTHOOK=0 git commit ...`.
 # Docs: https://lefthook.dev
@@ -16,7 +19,7 @@ pre-commit:
     format:
       # gofumpt (a stricter gofmt) + goimports, as configured for golangci-lint.
       glob: "*.go"
-      run: golangci-lint fmt {staged_files} && git add {staged_files}
+      run: export PATH="$(go env GOPATH)/bin:$PATH" && golangci-lint fmt {staged_files} && git add {staged_files}
       stage_fixed: true
     mod-tidy:
       glob: "{go.mod,go.sum}"
@@ -25,6 +28,4 @@ pre-commit:
 pre-push:
   commands:
     lint:
-      run: golangci-lint run
-    test:
-      run: make test-short
+      run: export PATH="$(go env GOPATH)/bin:$PATH" && golangci-lint run
