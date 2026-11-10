@@ -1,0 +1,1 @@
+{"id":"op_cccccccccccccccccccccccccccccccccccccccccccccccccccc","attempt":"att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","kind":"write","seq":1,"parent":"op_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","path":"internal/auth/login.go","blob":"0123456789abcdef","by":"agent:impl-3","at":"2026-09-02T12:01:00Z","signature":"c2lnbmF0dXJl"}

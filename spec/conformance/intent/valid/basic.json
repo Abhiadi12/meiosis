@@ -1,0 +1,16 @@
+{
+  "id": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "repo": "github.com/example/meiosis",
+  "title": "Add rate limiting",
+  "goal": "Protect the authentication endpoint from abuse.",
+  "acceptance": [
+    {"text": "Unit tests cover the limiter", "check": {"kind": "test", "selector": "./..."}}
+  ],
+  "non_goals": ["Changing the authentication protocol"],
+  "scope": {"allow": ["internal/auth/**"], "deny": ["internal/auth/secrets/**"], "mode": "enforce"},
+  "context_pins": [{"ref": "spec/v1/README.md", "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "kind": "spec"}],
+  "created_by": "human:lakin",
+  "created_at": "2026-09-02T12:00:00Z",
+  "status": "open",
+  "signature": "c2lnbmF0dXJl"
+}

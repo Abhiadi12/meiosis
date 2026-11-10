@@ -1,0 +1,14 @@
+{
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "agent": "agent:planner-7",
+  "model": "example-model",
+  "model_ver": "2026-09-01",
+  "tools": ["go test ./...", "go vet ./..."],
+  "prompt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "seed": 7,
+  "params": {"temperature": "0.7"},
+  "tokens_in": 1200,
+  "tokens_out": 800,
+  "cost_micros": 250000,
+  "signature": "c2lnbmF0dXJl"
+}

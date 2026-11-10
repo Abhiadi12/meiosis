@@ -1,0 +1,7 @@
+{"Time":"2026-09-09T10:00:00Z","Action":"start","Package":"ex/auth"}
+{"Time":"2026-09-09T10:00:00Z","Action":"run","Package":"ex/auth","Test":"TestA"}
+{"Time":"2026-09-09T10:00:00Z","Action":"output","Package":"ex/auth","Test":"TestA","Output":"ok\n"}
+{"Time":"2026-09-09T10:00:00Z","Action":"pass","Package":"ex/auth","Test":"TestA","Elapsed":0}
+{"Time":"2026-09-09T10:00:00Z","Action":"run","Package":"ex/auth","Test":"TestB"}
+{"Time":"2026-09-09T10:00:00Z","Action":"skip","Package":"ex/auth","Test":"TestB","Elapsed":0}
+{"Time":"2026-09-09T10:00:01Z","Action":"pass","Package":"ex/auth","Elapsed":1.5}

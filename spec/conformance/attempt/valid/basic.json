@@ -1,0 +1,11 @@
+{
+  "id": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "intent": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "author": "agent:planner-7",
+  "world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "base_world": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "git_commit": "0123456789abcdef0123456789abcdef01234567",
+  "status": "open",
+  "created_at": "2026-09-02T12:10:00Z",
+  "signature": "c2lnbmF0dXJl"
+}

@@ -1,0 +1,54 @@
+{
+  "cases": [
+    {
+      "name": "intent",
+      "object": {
+        "id": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "repo": "github.com/example/meiosis",
+        "title": "Add rate limiting",
+        "goal": "Protect the endpoint.",
+        "acceptance": [
+          {
+            "text": "Limiter is tested"
+          }
+        ],
+        "scope": {
+          "allow": [
+            "internal/auth/**"
+          ],
+          "mode": "enforce"
+        },
+        "created_by": "human:lakin",
+        "created_at": "2026-09-02T12:00:00Z",
+        "status": "open",
+        "signature": ""
+      },
+      "canonical_unsigned": "{\"acceptance\":[{\"text\":\"Limiter is tested\"}],\"created_at\":\"2026-09-02T12:00:00Z\",\"created_by\":\"human:lakin\",\"goal\":\"Protect the endpoint.\",\"id\":\"int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"repo\":\"github.com/example/meiosis\",\"scope\":{\"allow\":[\"internal/auth/**\"],\"mode\":\"enforce\"},\"status\":\"open\",\"title\":\"Add rate limiting\"}",
+      "signature": "afkB/qUo61EO1DQDcoI8cGxqTcfkh9p7VySKgt6jem32YQ/bmj4YA7E6yqqnVNa8BRRRsqKKjhHNIR46j/GuBQ=="
+    },
+    {
+      "name": "evidence",
+      "object": {
+        "id": "evd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "test-run",
+        "producer": "agent:ci",
+        "independent": true,
+        "outcome": "pass",
+        "payload": {
+          "tests": 42,
+          "failures": 0
+        },
+        "expires_at": "0001-01-01T00:00:00Z",
+        "created_at": "2026-09-02T12:20:00Z",
+        "signature": ""
+      },
+      "canonical_unsigned": "{\"attempt\":\"att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"created_at\":\"2026-09-02T12:20:00Z\",\"expires_at\":\"0001-01-01T00:00:00Z\",\"id\":\"evd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"independent\":true,\"kind\":\"test-run\",\"outcome\":\"pass\",\"payload\":{\"failures\":0,\"tests\":42},\"producer\":\"agent:ci\",\"world\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+      "signature": "FKwgEOQtdM40+I04MHefojP6yEn8Aa7EhYfNobeTKNC+/CYJ9uWYLWzAFklvbKwrkezx3TqmXT0i6CB77/T4DA=="
+    }
+  ],
+  "description": "Ed25519 (RFC 8032) signatures over the RFC 8785 canonical form of an object with its top-level `signature` member removed, base64 (standard alphabet). The key is derived from the 32-byte seed 000102...1f.",
+  "public_key": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+  "seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+}

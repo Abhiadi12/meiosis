@@ -1,0 +1,11 @@
+{
+  "id": "evidence-1",
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "kind": "test-run",
+  "producer": "agent:planner-7",
+  "outcome": "unknown",
+  "payload": {},
+  "created_at": "2026-09-02T12:20:00Z",
+  "signature": "c2lnbmF0dXJl"
+}

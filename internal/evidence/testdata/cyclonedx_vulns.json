@@ -1,0 +1,10 @@
+{
+  "bomFormat": "CycloneDX", "specVersion": "1.5",
+  "components": [{"name": "a"}, {"name": "b"}, {"name": "c"}],
+  "vulnerabilities": [
+    {"id": "CVE-1", "ratings": [{"severity": "low"}, {"severity": "high"}]},
+    {"id": "CVE-2", "ratings": [{"severity": "medium"}]},
+    {"id": "CVE-3", "ratings": []},
+    {"id": "CVE-4", "ratings": [{"severity": "info"}]}
+  ]
+}

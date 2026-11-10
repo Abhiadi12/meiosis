@@ -1,0 +1,14 @@
+{
+  "version": "2.1.0",
+  "runs": [{
+    "tool": {"driver": {"name": "golangci-lint"}},
+    "results": [
+      {"ruleId": "errcheck", "level": "error", "message": {"text": "unchecked"}},
+      {"ruleId": "errcheck", "level": "error"},
+      {"ruleId": "unused", "level": "warning"},
+      {"ruleId": "style"},
+      {"ruleId": "info-only", "level": "note"},
+      {"ruleId": "n", "level": "none"}
+    ]
+  }]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "evidence-1",
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "kind": "test-run",
+  "producer": "agent:ci",
+  "outcome": "pass",
+  "footprint": ["internal/auth/**"],
+  "payload": {"tests": 42, "failed": 0},
+  "expires_at": "2026-09-03T12:00:00Z",
+  "created_at": "2026-09-02T12:20:00Z",
+  "signature": "c2lnbmF0dXJl"
+}

@@ -1,0 +1,74 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errcheck
+    - errname
+    - errorlint
+    - forcetypeassert
+    - gosec
+    - govet
+    - ineffassign
+    - intrange
+    - misspell
+    - nilerr
+    - nolintlint
+    - perfsprint
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - usestdlibvars
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        - name: exported
+        - name: blank-imports
+        - name: unused-parameter
+        - name: error-return
+        - name: error-naming
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: var-declaration
+        - name: package-comments
+        - name: receiver-naming
+        - name: context-as-argument
+        - name: dot-imports
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+  exclusions:
+    rules:
+      # Test helpers such as rpc() close the body for the caller.
+      - path: _test\.go
+        linters: [bodyclose]
+      # Tests build throwaway fixtures; permission modes and unchecked
+      # assertions add noise, not safety.
+      - path: _test\.go
+        linters: [forcetypeassert, gosec]
+      # A CLI reads and writes the paths its user names, and runs git: that is
+      # its job, so these two rules would flag nearly every call. The rest of
+      # gosec (permissions, crypto, injection, overflow) stays on.
+      - linters: [gosec]
+        text: "G304|G204"
+      # G101 matches the names of environment variables, not credentials.
+      - linters: [gosec]
+        text: "G101"
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+run:
+  tests: true

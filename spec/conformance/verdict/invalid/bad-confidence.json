@@ -1,0 +1,12 @@
+{
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "decision": "reject",
+  "decided_by": "human:lakin",
+  "policy_ref": "policy @ hash",
+  "policy_in": {},
+  "risk": {"blast_radius": 0, "sensitive_paths": [], "incident_density": 0},
+  "confidence": 1.5,
+  "rationale": "Decision.",
+  "decided_at": "2026-09-02T12:30:00Z",
+  "signature": "c2lnbmF0dXJl"
+}

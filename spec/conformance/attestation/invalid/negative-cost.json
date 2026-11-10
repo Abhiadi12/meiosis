@@ -1,0 +1,12 @@
+{
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "agent": "agent:planner-7",
+  "model": "example-model",
+  "model_ver": "2026-09-01",
+  "tools": ["go test ./..."],
+  "prompt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tokens_in": 1200,
+  "tokens_out": 800,
+  "cost_micros": -1,
+  "signature": "c2lnbmF0dXJl"
+}

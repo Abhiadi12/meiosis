@@ -1,0 +1,12 @@
+{
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "decision": "merge",
+  "decided_by": "human:lakin",
+  "policy_ref": ".meiosis/policy/default.rego @ aaaaaaaaa",
+  "policy_in": {"required_evidence": ["test-run"]},
+  "risk": {"blast_radius": 3, "sensitive_paths": [], "incident_density": 0.1},
+  "confidence": 0.95,
+  "rationale": "Independent tests passed.",
+  "decided_at": "2026-09-02T12:30:00Z",
+  "signature": "c2lnbmF0dXJl"
+}

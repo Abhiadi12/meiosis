@@ -1,0 +1,84 @@
+{
+  "cases": [
+    {
+      "name": "empty tree",
+      "files": [],
+      "world": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+    },
+    {
+      "name": "one file",
+      "files": [
+        {
+          "path": "README.md",
+          "content_base64": "aGVsbG8K"
+        }
+      ],
+      "world": "ad16fdffa23c245ff1a1f0c4d9661807227bb793170fafe5ac9bca005fd76fc5"
+    },
+    {
+      "name": "empty file",
+      "files": [
+        {
+          "path": "empty",
+          "content_base64": ""
+        }
+      ],
+      "world": "b01dc199567531585e935482383d1a0ea291c3dabbcadff65ed4fa7be5f3a21c"
+    },
+    {
+      "name": "path order is bytewise, directories are not special",
+      "files": [
+        {
+          "path": "B",
+          "content_base64": "NQ=="
+        },
+        {
+          "path": "a-b",
+          "content_base64": "MQ=="
+        },
+        {
+          "path": "a.txt",
+          "content_base64": "NA=="
+        },
+        {
+          "path": "a/b",
+          "content_base64": "Mg=="
+        },
+        {
+          "path": "a0",
+          "content_base64": "Mw=="
+        }
+      ],
+      "world": "cebbec1c559d17552c1798195643756526a344e0d6ba634547a442659f38fa20"
+    },
+    {
+      "name": "nested and binary",
+      "files": [
+        {
+          "path": "dir/g.txt",
+          "content_base64": "Zw=="
+        },
+        {
+          "path": "dir/sub/f.bin",
+          "content_base64": "AAH//g=="
+        },
+        {
+          "path": "z",
+          "content_base64": "eg=="
+        }
+      ],
+      "world": "2b4c4fa4ab0daede58abc99ed6cbe70f8a4d8f7efe9acac59c9268eae816f495"
+    },
+    {
+      "name": "non-ASCII path",
+      "files": [
+        {
+          "path": "café/中文.txt",
+          "content_base64": "eA=="
+        }
+      ],
+      "world": "0fedbf01f2c89b0a848e7607da22a8a77518c9fdad4802541bdfdc18ca7fdfbd"
+    }
+  ],
+  "description": "World hash: BLAKE3-256 over, for each file in ascending byte order of path, u64be(len(path)) || path || u64be(len(content)) || content. File modes and directories are not part of a world. Files are given here in that order; an implementation must not rely on that."
+}

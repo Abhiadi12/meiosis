@@ -1,0 +1,3 @@
+<testsuite name="solo" tests="1">
+  <testcase classname="solo.T" name="TestOnly" time="0.1"/>
+</testsuite>

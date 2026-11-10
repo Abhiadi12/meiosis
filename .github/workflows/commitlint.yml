@@ -1,0 +1,22 @@
+name: Commit Lint
+
+on:
+  pull_request:
+    types: ['opened', 'edited', 'reopened', 'synchronize']
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # tools/commitlint is part of this repository; no npm needed.
+      - name: Validate PR commits
+        run: go run ./tools/commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}

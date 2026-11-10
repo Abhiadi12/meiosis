@@ -1,0 +1,25 @@
+{
+  "id": "ref_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "repo": "meiosis", "ref": "refs/heads/feature",
+  "old_commit": "1111111111111111111111111111111111111111",
+  "new_commit": "2222222222222222222222222222222222222222",
+  "world": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "base_world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pushed_by": "agent:planner-7",
+  "token": {
+    "id": "cap_cccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "principal": "agent:planner-7", "issued_by": "human:lakin",
+    "intent": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": {"allow": ["internal/**"], "mode": "enforce"},
+    "issued_at": "2026-09-02T12:00:00Z", "expires_at": "2026-09-02T13:00:00Z",
+    "operations": ["git_push"],
+    "signature": "c2lnbmF0dXJl"
+  },
+  "intent": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "changed_paths": 3,
+  "scope_violations": [{"path": "docs/notes.md", "reason": "matches no allow rule (allow: internal/**)"}],
+  "at": "2026-09-02T12:30:00Z",
+  "signed_by": "human:lakin",
+  "signature": "c2lnbmF0dXJl"
+}
