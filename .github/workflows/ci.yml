@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  schedule:
+    - cron: "17 6 * * 1"
   push:
     branches: [ main, dev ]  # feature branches are covered by their pull request
   pull_request:
@@ -32,7 +34,19 @@ jobs:
         run: make tidy-check
       - name: Every release target builds without cgo
         run: make cross
-      - name: Vulnerabilities
+
+  # Separate from hygiene because it uses the newest Go: govulncheck needs a
+  # recent toolchain, and a standard-library vulnerability is only fixed by one.
+  # It also runs weekly, so a newly published advisory shows up without a PR.
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          check-latest: true
+      - name: Known vulnerabilities in dependencies and the standard library
         run: make vuln
 
   test:
