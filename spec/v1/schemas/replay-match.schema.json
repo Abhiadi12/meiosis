@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "replay-match payload",
+  "type": "object",
+  "properties": {
+    "bundle": {"type": "string", "description": "digest of the zygote run bundle"},
+    "matched": {"type": "boolean"},
+    "diverged_at": {"type": "integer", "minimum": 0, "description": "index of the first step that diverged, when matched is false"}
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "name": "intent",
+      "prefix": "int_",
+      "template": {
+        "id": "",
+        "repo": "github.com/example/meiosis",
+        "title": "Add rate limiting",
+        "goal": "Protect the endpoint.",
+        "acceptance": [
+          {
+            "text": "Limiter is tested"
+          }
+        ],
+        "scope": {
+          "allow": [
+            "internal/auth/**"
+          ],
+          "mode": "enforce"
+        },
+        "created_by": "human:lakin",
+        "created_at": "2026-09-02T12:00:00Z",
+        "status": "open",
+        "signature": ""
+      },
+      "canonical": "{\"acceptance\":[{\"text\":\"Limiter is tested\"}],\"created_at\":\"2026-09-02T12:00:00Z\",\"created_by\":\"human:lakin\",\"goal\":\"Protect the endpoint.\",\"id\":\"\",\"repo\":\"github.com/example/meiosis\",\"scope\":{\"allow\":[\"internal/auth/**\"],\"mode\":\"enforce\"},\"signature\":\"\",\"status\":\"open\",\"title\":\"Add rate limiting\"}",
+      "id": "int_2cpojkv2jc3p3z5duv2xjwcxisc3twhrcg2rosf5mayq6fvur3mq"
+    },
+    {
+      "name": "evidence",
+      "prefix": "evd_",
+      "template": {
+        "id": "",
+        "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "test-run",
+        "producer": "agent:ci",
+        "outcome": "pass",
+        "payload": {
+          "tests": 42
+        },
+        "expires_at": "0001-01-01T00:00:00Z",
+        "created_at": "2026-09-02T12:20:00Z",
+        "signature": ""
+      },
+      "canonical": "{\"attempt\":\"att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"created_at\":\"2026-09-02T12:20:00Z\",\"expires_at\":\"0001-01-01T00:00:00Z\",\"id\":\"\",\"kind\":\"test-run\",\"outcome\":\"pass\",\"payload\":{\"tests\":42},\"producer\":\"agent:ci\",\"signature\":\"\",\"world\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+      "id": "evd_wfnmknf4brjkrqfoiz4luehqeprq5xawktabnrqxgb2lchr6mmxa"
+    }
+  ],
+  "description": "Content-derived IDs: prefix + base32 (RFC 4648 alphabet, lower case, no padding) of the BLAKE3-256 digest of the RFC 8785 canonical form of the object with its `id` and `signature` members present and empty (the object as the Go reference marshals it, zero values included). `canonical` is that exact input."
+}

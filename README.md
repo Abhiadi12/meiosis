@@ -36,6 +36,99 @@ meiosis attaches it to a content hash.
 
 ---
 
+## Install
+
+### Prebuilt binaries
+
+Quick install (detects your OS/arch automatically — installs `mei` and
+`meiosisd` into `/usr/local/bin` on Linux/macOS, `%LOCALAPPDATA%\mei` on
+Windows):
+
+**Linux/macOS:**
+
+```sh
+curl -fsSL https://github.com/subhranshus-mindfire/meiosis/releases/latest/download/install.sh | bash
+```
+
+**Windows (PowerShell, no bash needed):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://github.com/subhranshus-mindfire/meiosis/releases/latest/download/install.ps1 | iex"
+```
+
+Or download the archive for your platform from the
+[latest release](https://github.com/mindfire-test/meiosis/releases/latest)
+(each contains both `mei` and `meiosisd`):
+
+| Platform | Archive |
+| --- | --- |
+| Linux x86_64 / arm64 | `mei-linux-amd64.tar.gz` / `mei-linux-arm64.tar.gz` |
+| macOS Intel / Apple Silicon | `mei-darwin-amd64.tar.gz` / `mei-darwin-arm64.tar.gz` |
+| Windows x86_64 / arm64 | `mei-windows-amd64.zip` / `mei-windows-arm64.zip` |
+
+Linux/macOS example:
+
+```sh
+curl -sSLo mei-linux-amd64.tar.gz \
+  https://github.com/mindfire-test/meiosis/releases/latest/download/mei-linux-amd64.tar.gz
+tar xzf mei-linux-amd64.tar.gz
+install -m 0755 mei meiosisd /usr/local/bin
+mei version
+```
+
+Optionally verify the download against `SHA256SUMS.txt` from the same release.
+
+The Windows installer also adds `mei.exe` to your user PATH — open a new
+terminal after it finishes.
+
+### From source
+
+Requires Go 1.25+.
+
+```sh
+make build        # produces bin/mei and bin/meiosisd
+export PATH="$PWD/bin:$PATH"
+```
+
+### First run
+
+In any repository you want to govern, `mei init` bootstraps everything —
+identity keys, a 30-day capability token, agent instructions, and MCP server
+registration. It picks up VS Code (`.vscode/mcp.json`), Antigravity
+(`~/.gemini/antigravity/mcp_config.json`), or both:
+
+```sh
+cd <your-project>
+mei init                       # auto-detect IDE
+mei init --ide vscode          # register with VS Code only
+mei init --ide antigravity     # register with Antigravity only
+mei init --ide vscode,antigravity   # both
+```
+
+Open the project in your IDE, approve the `meiosisd` server, and ask the
+agent to declare an intent. `mei init` is idempotent; rerun it to repair a
+partial setup, or `mei init --force` to regenerate secrets.
+
+### Serve it over Git
+
+```sh
+mei serve                          # git + MCP on http://127.0.0.1:8484
+mei remote add meiosis             # in your git repo: adds the remote and a credential helper
+git push meiosis main              # recorded with the world hash of the pushed tree
+git push -o intent=int_… meiosis main   # push under a declared intent: its scope is enforced
+mei refs                           # every ref update, its world hash, who pushed it
+```
+
+Plain `git clone` and `git fetch` work against the same URL, so the code and its
+history never depend on meiosis. Every request needs a capability token; the
+credential helper mints a short-lived one from your repository key. Agents and CI
+use `mei token bearer` (`git -c http.extraHeader="Authorization: Bearer $(mei token bearer)" push …`).
+A push that names no intent is accepted under an implicit intent in `warn` mode.
+Deleting refs and rewriting history are refused. Bind to a non-loopback address
+only behind TLS: tokens are bearer credentials.
+
+---
+
 ## Why this exists
 
 The reviewable unit is wrong.
@@ -149,23 +242,38 @@ No bindings to write.
 
 ## Status
 
-**Design stage. There is no working binary yet.**
+**M1 works.** A developer with one agent gets scope enforced when the agent
+writes, a signed provenance record for what it did, and test, lint, coverage and
+SBOM reports recorded as evidence bound to the exact tree they describe. It
+serves your repository over plain Git, enforces the same scope on pushes, and
+records a signed world hash for every ref update. This is exercised end to end,
+against the real binaries, on every build.
 
-The [format specification](spec/v1/README.md) and requirements are written and reviewable; implementation
-starts at M0. If you are here to try it, come back after M1 — that is the first
-milestone that does anything useful. If you are here to argue with the design,
-now is exactly the right time.
+**It does not merge anything yet.** There is no policy gate, no verdict and no
+review surface: evidence is recorded, and its independence and freshness are
+shown, but nothing acts on them. Evidence goes stale when its world changes, not
+yet when something it depends on does. Worlds use a placeholder hash. SSH,
+Postgres, export/import and the web UI are not here. M1's own requirements are met except
+ConnectRPC (a JSON API with idempotency keys stands in), SSH, signed-commit
+verification, OTLP traces and CI benchmarks for the performance targets.
+**[`docs/m1-status.md`](docs/m1-status.md) lists every requirement as done,
+partly done or not done, and what you will trip over.** Operating notes are in
+[`docs/operations.md`](docs/operations.md), the JSON API in
+[`docs/api.md`](docs/api.md) and the security analysis in
+[`docs/threat-model.md`](docs/threat-model.md).
 
 | | | |
 |---|---|---|
-| **M0** | in progress | object model, canonical encoding, signing, Git wire serving, storage |
-| **M1** | next | intent, scope enforcement, evidence ingest, capabilities, MCP, CLI |
-| **M2** | | footprints, automatic invalidation, verified/stale status, policy gate |
+| **M0** | mostly done | object model, canonical encoding, signing, Git over HTTP, world hashes, SQLite. No SSH. |
+| **M1** | complete, with stated gaps | intent, scope enforcement, workspaces with fork and undo, evidence ingest, capability tokens and delegation, MCP, JSON API, CLI, secret scanning, backup. |
+| **M2** | next | footprints, automatic invalidation, verified/stale status, policy gate, review surface |
 | **M3** | | speculative merge queue, incremental re-verification, semantic conflicts |
 | **M4** | | continuous re-validation, outcome linking, calibration |
 
-Full detail in [`docs/SRS.md`](docs/SRS.md), including numbered requirements,
-measurable targets, and the open decisions that are still open.
+Code layout and dependency rules: [`docs/architecture.md`](docs/architecture.md). Everything in `docs/` is indexed in [`docs/README.md`](docs/README.md).
+
+Requirement numbers (FR-…, NFR-…) refer to the SRS, which is not yet in this
+repository; the [format specification](spec/v1/README.md) is.
 
 ## What this is not
 
@@ -187,8 +295,7 @@ Stated plainly, so nobody is surprised later:
 One static binary. No cgo, no Kubernetes, no external services.
 
 ```sh
-# planned — not yet functional
-mei serve
+mei init && mei serve
 ```
 
 SQLite and the local filesystem by default. Postgres and any S3-compatible

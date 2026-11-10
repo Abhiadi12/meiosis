@@ -2,6 +2,7 @@ package gitserver
 
 import (
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -65,7 +66,7 @@ func TestSmartHTTPRejectsTraversalPath(t *testing.T) {
 		t.Fatalf("NewHandler() error = %v", err)
 	}
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest("GET", "/../secret/info/refs", nil)
+	request := httptest.NewRequest(http.MethodGet, "/../secret/info/refs", nil)
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != 400 {
 		t.Fatalf("status = %d, want 400", recorder.Code)

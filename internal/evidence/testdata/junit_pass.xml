@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="all" tests="3" failures="0" time="1.5">
+  <testsuite name="auth" tests="2" time="1.0">
+    <testcase classname="auth.Login" name="TestLogin" time="0.4"/>
+    <testcase classname="auth.Login" name="TestLogout" time="0.6"/>
+  </testsuite>
+  <testsuite name="billing" tests="1" time="0.5">
+    <testcase classname="billing.Invoice" name="TestTotal" time="0.5"/>
+  </testsuite>
+</testsuites>

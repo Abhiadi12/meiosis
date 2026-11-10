@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "security-scan payload",
+  "type": "object",
+  "properties": {
+    "format": {"type": "string"},
+    "tools": {"type": "array", "items": {"type": "string"}},
+    "spec_version": {"type": "string"},
+    "components": {"type": "integer", "minimum": 0},
+    "results": {"type": "integer", "minimum": 0},
+    "counts": {"type": "object", "properties": {"error": {"type": "integer", "minimum": 0}, "warning": {"type": "integer", "minimum": 0}, "note": {"type": "integer", "minimum": 0}}},
+    "vulnerabilities": {"type": "object", "properties": {"critical": {"type": "integer", "minimum": 0}, "high": {"type": "integer", "minimum": 0}, "medium": {"type": "integer", "minimum": 0}, "low": {"type": "integer", "minimum": 0}, "unknown": {"type": "integer", "minimum": 0}}}
+  }
+}

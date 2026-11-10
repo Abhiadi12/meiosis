@@ -2,6 +2,7 @@ package v1
 
 import "strings"
 
+// Attestation is the signed provenance of one world: who produced it, with which model and tools. See spec/v1/attestation.md.
 type Attestation struct {
 	Attempt    string            `json:"attempt"`
 	Agent      string            `json:"agent"`
@@ -18,6 +19,7 @@ type Attestation struct {
 	Signature  string            `json:"signature"`
 }
 
+// Validate reports whether the attestation is well formed; it checks shape, not signatures.
 func (a Attestation) Validate() error {
 	if !validContentID(a.Attempt, "att_") || !validPrincipalID(a.Agent) || strings.TrimSpace(a.Model) == "" || strings.TrimSpace(a.ModelVer) == "" || len(a.Tools) == 0 || !validHexDigest(a.PromptHash) || a.TokensIn < 0 || a.TokensOut < 0 || a.CostMicros < 0 || strings.TrimSpace(a.Signature) == "" {
 		return ErrInvalidAttestation

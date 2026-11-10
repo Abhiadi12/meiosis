@@ -1,0 +1,25 @@
+{
+  "id": "cap_dddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "principal": "agent:tests-1",
+  "issued_by": "agent:planner-7",
+  "intent": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scope": {"allow": ["internal/auth/login/**"], "deny": ["internal/auth/secrets/**"], "mode": "enforce"},
+  "issued_at": "2026-09-02T12:05:00Z",
+  "expires_at": "2026-09-02T12:35:00Z",
+  "operations": ["attempt_write"],
+  "spend_ceiling_micros": 100000,
+  "parent": {
+    "id": "cap_cccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "principal": "agent:planner-7",
+    "issued_by": "human:lakin",
+    "intent": "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": {"allow": ["internal/auth/**"], "deny": ["internal/auth/secrets/**"], "mode": "enforce"},
+    "issued_at": "2026-09-02T12:00:00Z",
+    "expires_at": "2026-09-02T13:00:00Z",
+    "holder_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "operations": ["attempt_open", "attempt_write", "capability_delegate"],
+    "spend_ceiling_micros": 500000,
+    "signature": "c2lnbmF0dXJl"
+  },
+  "signature": "c2lnbmF0dXJl"
+}

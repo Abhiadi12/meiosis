@@ -4,7 +4,8 @@ An **Attempt** represents one principal's specific implementation of an `Intent`
 
 ## Purpose & Lifecycle
 - **Competitive Attempts (FR-6.6):** Meiosis supports multiple concurrent attempts resolving the same Intent. They are ranked by evidence under policy. When one merges, the others are archived with their evidence intact.
-- **Immutability:** Attempts are append-only. When a developer pushes a new commit to an attempt, it technically generates a new `Attempt` object (or updates a mutable state table referencing immutable attempts).
+- **Immutability:** Attempts are append-only. The reference implementation stores the attempt as an immutable *creation record* (`world == base_world`, `status == "open"`, no violations) and keeps its changing fields (`world`, `scope_violations`, `status`) in a separate, mutable **state snapshot**: a complete `Attempt` object with the same `id`, `intent`, `author`, `base_world` and `created_at`, signed by the author. The creation record is never rewritten, and a state snapshot that changes any identifying field is rejected. The *current view* of an attempt is its latest state snapshot, or the creation record if there is none.
+- **Worlds:** Each commit stores a *world manifest* (path to content digest) addressed by the resulting `WorldHash`; manifests are immutable.
 
 ## Object Definition
 
@@ -14,6 +15,7 @@ An **Attempt** represents one principal's specific implementation of an `Intent`
 - `author` (String, required): PrincipalID of the author (human or agent).
 - `world` (String, required): The 32-byte BLAKE3 `WorldHash` of the implementation's tree state.
 - `base_world` (String, required): The `WorldHash` of the base tree this attempt was branched from.
+- `forked_from` (String, optional): the `AttemptID` whose workspace state this attempt was forked from (FR-2.3). The fork's operation log continues the source's; see [Operation](operation.md).
 - `git_commit` (String, optional): The Git commit hash corresponding to this world state (for Git interop).
 - `scope_violations` (Array of Object, optional): If the Intent's scope mode was `"warn"`, any modifications outside the allowed scope are logged here.
 - `status` (String, required): Current status. Allowed values include `"open"`, `"merged"`, `"abandoned"`.

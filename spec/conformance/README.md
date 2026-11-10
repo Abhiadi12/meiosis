@@ -22,3 +22,14 @@ The Go adapter test in `conformance_test.go` exercises these fixtures against
 the public `github.com/mindfire-test/meiosis/pkg/spec/v1` package. Other
 implementations can consume the same JSON files without depending on Go or
 Meiosis internals.
+
+## Known-answer vectors
+
+`vectors/` holds exact expected outputs (SRS §4.3, §11.4), not just accept/reject cases:
+
+- `canonical.json`: RFC 8785 inputs and their canonical bytes.
+- `signatures.json`: Ed25519 signatures from the fixed seed `00 01 … 1f`; Ed25519 is deterministic, so signing must reproduce them exactly.
+- `content-ids.json`: object templates, canonical form and resulting `int_` / `evd_` IDs.
+- `world-hashes.json`: file sets and their world hashes.
+
+`verify_vectors.py` checks the same files with no Go code and no dependency on this implementation (`python3 verify_vectors.py`); a second implementation should pass both.

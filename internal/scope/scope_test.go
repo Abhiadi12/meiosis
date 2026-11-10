@@ -2,19 +2,21 @@ package scope
 
 import (
 	"testing"
+
+	specv1 "github.com/mindfire-test/meiosis/pkg/spec/v1"
 )
 
-func TestIntentIsAllowed(t *testing.T) {
+func TestIsPathAllowed(t *testing.T) {
 	tests := []struct {
 		name    string
-		intent  Intent
+		intent  specv1.Scope
 		path    string
 		want    bool
 		wantErr bool
 	}{
 		{
 			name: "allowed path within glob",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"pkg/auth/**"},
 			},
 			path: "pkg/auth/token.go",
@@ -22,7 +24,7 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name: "allowed path deep within glob",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"pkg/auth/**"},
 			},
 			path: "pkg/auth/middleware/session.go",
@@ -30,7 +32,7 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name: "denied path by explicit deny rule",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"pkg/auth/**"},
 				Deny:  []string{"pkg/billing/**"},
 			},
@@ -39,7 +41,7 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name: "deny takes precedence over allow",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"pkg/auth/**"},
 				Deny:  []string{"pkg/auth/secrets.go"},
 			},
@@ -48,7 +50,7 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name: "path not in allow list defaults to false",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"pkg/auth/**"},
 			},
 			path: "pkg/user/user.go",
@@ -56,13 +58,13 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name:   "empty intent denies all",
-			intent: Intent{},
+			intent: specv1.Scope{},
 			path:   "README.md",
 			want:   false,
 		},
 		{
 			name: "invalid allow pattern returns error",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"["}, // malformed doublestar glob
 			},
 			path:    "test.go",
@@ -70,7 +72,7 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name: "invalid deny pattern returns error",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"**/*.go"},
 				Deny:  []string{"["}, // malformed doublestar glob
 			},
@@ -79,7 +81,7 @@ func TestIntentIsAllowed(t *testing.T) {
 		},
 		{
 			name: "multiple allow rules",
-			intent: Intent{
+			intent: specv1.Scope{
 				Allow: []string{"pkg/auth/**", "cmd/mei/**"},
 			},
 			path: "cmd/mei/main.go",
@@ -89,27 +91,20 @@ func TestIntentIsAllowed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.intent.IsAllowed(tt.path)
+			got, err := New(tt.intent).IsPathAllowed(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Intent.IsAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("IsPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("Intent.IsAllowed() = %v, want %v", got, tt.want)
+				t.Errorf("IsPathAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestIsPathAllowedFunction(t *testing.T) {
-	allowed, err := IsPathAllowed(Intent{Allow: []string{"**/*.go"}}, "internal/scope/scope.go")
-	if err != nil || !allowed {
-		t.Fatalf("IsPathAllowed() = %v, %v; want true, nil", allowed, err)
-	}
-}
-
 func TestIsPathAllowedRejectsUnsafePaths(t *testing.T) {
-	intent := Intent{Allow: []string{"**"}}
+	intent := New(specv1.Scope{Allow: []string{"**"}})
 	for _, path := range []string{"", "/etc/passwd", "../secret", "pkg/../secret", `pkg\\secret.go`} {
 		t.Run(path, func(t *testing.T) {
 			if allowed, err := intent.IsPathAllowed(path); err == nil || allowed {

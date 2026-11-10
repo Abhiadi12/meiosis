@@ -11,6 +11,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Version is the mei release version. The cmd/mei entrypoint sets it from a
+// build-stamped value (-ldflags "-X main.version=..."); it defaults to "dev".
+var Version = "dev"
+
 // Settings contains the resolved CLI configuration.
 type Settings struct {
 	ConfigFile string
@@ -32,7 +36,7 @@ func New(config *viper.Viper) *cobra.Command {
 		Short:         "Meiosis developer CLI",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			if err := readConfig(config); err != nil {
 				return err
 			}
@@ -62,13 +66,38 @@ func New(config *viper.Viper) *cobra.Command {
 	bindFlag(config, flags, "verbose")
 
 	root.AddCommand(
-		newActionCommand("intent", "Manage intents", settings),
-		newActionCommand("attempt", "Manage attempts", settings),
-		newActionCommand("evidence", "Manage evidence", settings),
-		newActionCommand("status", "Show repository status", settings),
+		newInitCommand(settings),
+		newIntentCommand(settings),
+		newAttemptCommand(settings),
+		newEvidenceCommand(settings),
+		newStatusCommand(settings),
+		newChainCommand(settings),
+		newServeCommand(settings),
+		newHookCommand(),
+		newCredentialCommand(settings),
+		newTokenCommand(settings),
+		newRemoteCommand(settings),
+		newRefsCommand(settings),
+		newWorkCommand(settings),
+		newOpCommand(settings),
+		newBackupCommand(settings),
+		newRestoreCommand(settings),
+		newVersionCommand(),
 		newCompletionCommand(),
 	)
 	return root
+}
+
+func newVersionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the mei version",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "mei "+Version)
+			return err
+		},
+	}
 }
 
 func bindFlag(config *viper.Viper, flags *pflag.FlagSet, name string) {

@@ -1,3 +1,7 @@
+// Package crypto holds the Ed25519 key handling and signing used across
+// meiosis: PEM key files, and signatures over the RFC 8785 canonical form of any
+// spec/v1 object. It has no dependency on the rest of the implementation, so a
+// second implementation can reproduce it from the spec alone.
 package crypto
 
 import (
@@ -61,10 +65,26 @@ func LoadEncodedKeyPair(privateKey, publicKey string) (KeyPair, error) {
 	return LoadKeyPair(private, public)
 }
 
+// LoadEncodedPublicKey loads a base64 or PEM-encoded (PKIX) Ed25519 public
+// key, e.g. one written out for a daemon that only needs to verify tokens
+// signed by an issuer it doesn't hold the private key for.
+func LoadEncodedPublicKey(publicKey string) (ed25519.PublicKey, error) {
+	data, err := decodePublicKey(publicKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("%w: public key must be %d bytes", ErrInvalidKey, ed25519.PublicKeySize)
+	}
+	return ed25519.PublicKey(data), nil
+}
+
+// PublicKeyBase64 returns the public key as standard base64, the form stored in key files and tokens.
 func (k KeyPair) PublicKeyBase64() string {
 	return base64.StdEncoding.EncodeToString(k.PublicKey)
 }
 
+// PrivateKeyBase64 returns the private key as standard base64. Treat the result as a secret.
 func (k KeyPair) PrivateKeyBase64() string {
 	return base64.StdEncoding.EncodeToString(k.PrivateKey)
 }
@@ -89,7 +109,7 @@ func decodePrivateKey(value string) ([]byte, error) {
 	if block, _ := pem.Decode([]byte(value)); block != nil {
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("%w: parse private key PEM: %v", ErrInvalidKey, err)
+			return nil, fmt.Errorf("%w: parse private key PEM: %w", ErrInvalidKey, err)
 		}
 		private, ok := key.(ed25519.PrivateKey)
 		if !ok {
@@ -104,7 +124,7 @@ func decodePublicKey(value string) ([]byte, error) {
 	if block, _ := pem.Decode([]byte(value)); block != nil {
 		key, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("%w: parse public key PEM: %v", ErrInvalidKey, err)
+			return nil, fmt.Errorf("%w: parse public key PEM: %w", ErrInvalidKey, err)
 		}
 		public, ok := key.(ed25519.PublicKey)
 		if !ok {
@@ -121,7 +141,7 @@ func decodeBase64Key(value, kind string) ([]byte, error) {
 		data, err = base64.RawStdEncoding.DecodeString(value)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: decode %s key: %v", ErrInvalidKey, kind, err)
+		return nil, fmt.Errorf("%w: decode %s key: %w", ErrInvalidKey, kind, err)
 	}
 	return data, nil
 }

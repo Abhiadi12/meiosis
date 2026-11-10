@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release artifacts
+        run: bash scripts/release.sh "$GITHUB_REF_NAME"
+
+      - name: Include installer in release
+        run: |
+          cp scripts/install.sh dist/install.sh
+          cp scripts/install.ps1 dist/install.ps1
+
+      - name: Verify linux/amd64 binary
+        run: |
+          mkdir -p dist/build-check
+          tar xzf dist/mei-linux-amd64.tar.gz --strip-components=1 -C dist/build-check
+          test "$(./dist/build-check/mei version)" = "mei ${GITHUB_REF_NAME}"
+          ./dist/build-check/meiosisd -version | grep -q "^meiosisd " && test "$(./dist/build-check/meiosisd -version)" = "meiosisd ${GITHUB_REF_NAME}"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/mei-linux-amd64.tar.gz
+            dist/mei-linux-arm64.tar.gz
+            dist/mei-darwin-amd64.tar.gz
+            dist/mei-darwin-arm64.tar.gz
+            dist/mei-windows-amd64.zip
+            dist/mei-windows-arm64.zip
+            dist/SHA256SUMS.txt
+            dist/install.sh
+            dist/install.ps1
+          generate_release_notes: true

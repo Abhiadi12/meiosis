@@ -7,6 +7,7 @@ import (
 	"github.com/zeebo/blake3"
 )
 
+// BLAKE3DigestSize is the size in bytes of every BLAKE3 digest used by the format.
 const BLAKE3DigestSize = 32
 
 // HashCanonical returns the BLAKE3-256 digest of value's RFC 8785 canonical

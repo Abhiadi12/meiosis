@@ -21,12 +21,21 @@ func execute(t *testing.T, args ...string) string {
 }
 
 func TestCommandsExecute(t *testing.T) {
-	for _, name := range []string{"intent", "attempt", "evidence", "status"} {
+	for _, name := range []string{"intent", "attempt", "evidence"} {
 		t.Run(name, func(t *testing.T) {
 			if output := execute(t, name); !strings.Contains(output, name) {
 				t.Fatalf("output = %q, want command name", output)
 			}
 		})
+	}
+}
+
+func TestVersionCommand(t *testing.T) {
+	old := Version
+	defer func() { Version = old }()
+	Version = "v1.2.3"
+	if output := execute(t, "version"); !strings.Contains(output, "mei v1.2.3") {
+		t.Fatalf("output = %q, want stamped version", output)
 	}
 }
 
@@ -54,7 +63,7 @@ func TestConfigurationPrecedence(t *testing.T) {
 	var output strings.Builder
 	command.SetOut(&output)
 	command.SetErr(&output)
-	command.SetArgs([]string{"status", "--repo", "from-flag"})
+	command.SetArgs([]string{"intent", "--repo", "from-flag"})
 	if err := command.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}

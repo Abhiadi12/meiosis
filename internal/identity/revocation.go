@@ -2,6 +2,14 @@ package identity
 
 import "sync"
 
+// RevocationChecker reports whether a capability token has been revoked.
+// FR-1.7 requires revocation to propagate within 5s; the durable store in
+// revocation_store.go satisfies it across processes, and MemoryRevocationList
+// serves single-process use and tests.
+type RevocationChecker interface {
+	IsRevoked(tokenID string) bool
+}
+
 // MemoryRevocationList is an in-process RevocationChecker.
 type MemoryRevocationList struct {
 	mu      sync.RWMutex

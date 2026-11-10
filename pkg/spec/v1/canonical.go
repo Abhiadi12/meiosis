@@ -12,6 +12,7 @@ import (
 	"github.com/ucarion/jcs"
 )
 
+// Errors returned by canonicalisation; test with errors.Is.
 var (
 	ErrInvalidCanonicalJSON      = errors.New("invalid JSON for canonicalization")
 	ErrUnsupportedCanonicalValue = errors.New("unsupported value for canonicalization")
@@ -22,7 +23,7 @@ var (
 func Canonicalize(value any) ([]byte, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrUnsupportedCanonicalValue, err)
+		return nil, fmt.Errorf("%w: %w", ErrUnsupportedCanonicalValue, err)
 	}
 	return CanonicalizeJSON(data)
 }
@@ -34,13 +35,13 @@ func CanonicalizeJSON(data []byte) ([]byte, error) {
 
 	value, err := decodeCanonicalValue(decoder)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidCanonicalJSON, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidCanonicalJSON, err)
 	}
 	if _, tokenErr := decoder.Token(); !errors.Is(tokenErr, io.EOF) {
 		if tokenErr == nil {
 			return nil, fmt.Errorf("%w: multiple JSON values", ErrInvalidCanonicalJSON)
 		}
-		return nil, fmt.Errorf("%w: %v", ErrInvalidCanonicalJSON, tokenErr)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidCanonicalJSON, tokenErr)
 	}
 
 	normalized, err := normalizeCanonicalValue(value)
@@ -49,7 +50,7 @@ func CanonicalizeJSON(data []byte) ([]byte, error) {
 	}
 	canonical, err := jcs.Format(normalized)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidCanonicalJSON, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidCanonicalJSON, err)
 	}
 	return []byte(canonical), nil
 }

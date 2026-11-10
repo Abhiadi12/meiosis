@@ -1,0 +1,14 @@
+TN:
+SF:src/a.go
+DA:1,5
+DA:2,0
+DA:3,2,abcdef
+LF:3
+LH:2
+BRF:4
+BRH:1
+end_of_record
+SF:src/b.go
+LF:10
+LH:9
+end_of_record
