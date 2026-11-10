@@ -1,10 +1,31 @@
+# Dependency updates, batched so they do not flood the pull request list.
+# Security updates are separate: GitHub opens those immediately, whatever the
+# schedule below says.
 version: 2
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(deps)"
+    labels: ["dependencies", "go"]
+    groups:
+      # One PR for all minor and patch bumps; a major bump stays its own PR so
+      # it gets looked at on its own.
+      go-minor-and-patch:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(ci)"
+    labels: ["dependencies", "github_actions"]
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
