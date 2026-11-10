@@ -8,7 +8,6 @@ out it no longer applies.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/go-1.25%2B-00ADD8.svg)](go.mod)
-[![Status](https://img.shields.io/badge/status-design%20stage-orange.svg)](#status)
 
 ---
 
@@ -239,41 +238,6 @@ feature, not an accident.
 
 Agents reach the same functionality over **MCP**, served from the same binary.
 No bindings to write.
-
-## Status
-
-**M1 works.** A developer with one agent gets scope enforced when the agent
-writes, a signed provenance record for what it did, and test, lint, coverage and
-SBOM reports recorded as evidence bound to the exact tree they describe. It
-serves your repository over plain Git, enforces the same scope on pushes, and
-records a signed world hash for every ref update. This is exercised end to end,
-against the real binaries, on every build.
-
-**It does not merge anything yet.** There is no policy gate, no verdict and no
-review surface: evidence is recorded, and its independence and freshness are
-shown, but nothing acts on them. Evidence goes stale when its world changes, not
-yet when something it depends on does. Worlds use a placeholder hash. SSH,
-Postgres, export/import and the web UI are not here. M1's own requirements are met except
-ConnectRPC (a JSON API with idempotency keys stands in), SSH, signed-commit
-verification, OTLP traces and CI benchmarks for the performance targets.
-**[`docs/m1-status.md`](docs/m1-status.md) lists every requirement as done,
-partly done or not done, and what you will trip over.** Operating notes are in
-[`docs/operations.md`](docs/operations.md), the JSON API in
-[`docs/api.md`](docs/api.md) and the security analysis in
-[`docs/threat-model.md`](docs/threat-model.md).
-
-| | | |
-|---|---|---|
-| **M0** | mostly done | object model, canonical encoding, signing, Git over HTTP, world hashes, SQLite. No SSH. |
-| **M1** | complete, with stated gaps | intent, scope enforcement, workspaces with fork and undo, evidence ingest, capability tokens and delegation, MCP, JSON API, CLI, secret scanning, backup. |
-| **M2** | next | footprints, automatic invalidation, verified/stale status, policy gate, review surface |
-| **M3** | | speculative merge queue, incremental re-verification, semantic conflicts |
-| **M4** | | continuous re-validation, outcome linking, calibration |
-
-Code layout and dependency rules: [`docs/architecture.md`](docs/architecture.md). Everything in `docs/` is indexed in [`docs/README.md`](docs/README.md).
-
-Requirement numbers (FR-…, NFR-…) refer to the SRS, which is not yet in this
-repository; the [format specification](spec/v1/README.md) is.
 
 ## What this is not
 
