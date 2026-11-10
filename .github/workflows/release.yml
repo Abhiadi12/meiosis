@@ -12,9 +12,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
@@ -37,7 +37,7 @@ jobs:
           ./dist/build-check/meiosisd -version | grep -q "^meiosisd " && test "$(./dist/build-check/meiosisd -version)" = "meiosisd ${GITHUB_REF_NAME}"
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/mei-linux-amd64.tar.gz
