@@ -42,7 +42,8 @@ func newEnforcingRPCClient(t *testing.T, issuer crypto.KeyPair) *rpcClient {
 	t.Cleanup(func() {
 		_ = clientToServerW.Close()
 		select {
-		case <-done:
+		case serveErr := <-done:
+			_ = serveErr // the connection was closed on purpose; its error is not a failure
 		case <-time.After(time.Second):
 		}
 	})

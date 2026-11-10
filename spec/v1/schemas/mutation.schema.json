@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mutation payload",
+  "type": "object",
+  "properties": {
+    "mutants": {"type": "integer", "minimum": 0},
+    "killed": {"type": "integer", "minimum": 0},
+    "score": {"type": "number", "minimum": 0, "maximum": 1}
+  }
+}

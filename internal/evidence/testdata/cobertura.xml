@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<coverage line-rate="0.99" branch-rate="0.5" lines-valid="1000" lines-covered="990" version="1">
+  <packages>
+    <package name="p">
+      <classes>
+        <class name="a" filename="src/a.go">
+          <methods><method name="f"><lines><line number="1" hits="5"/></lines></method></methods>
+          <lines>
+            <line number="1" hits="5"/>
+            <line number="2" hits="0"/>
+            <line number="3" hits="2" branch="true" condition-coverage="50% (1/2)"/>
+            <line number="4" hits="1"/>
+          </lines>
+        </class>
+        <class name="b" filename="src/b.go">
+          <lines><line number="1" hits="0"/></lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

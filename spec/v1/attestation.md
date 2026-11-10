@@ -25,5 +25,6 @@ An **Attestation** is an in-toto-compatible signed provenance record. It securel
 
 ## Validation Rules & Relationships
 1. **Prompt Privacy (NFR-4.2):** Prompts routinely contain credentials or sensitive customer data. Therefore, the specification strictly requires storing only the `prompt_hash` by default. Full prompt retention is an opt-in server configuration and not part of the baseline Attestation object.
-2. **One-to-One Mapping:** While an Attempt can have many Evidence records, it typically has exactly one Attestation representing the generation of that specific WorldHash.
-3. **Capability Constraints (FR-1.4):** If the `cost_micros` pushes the agent's principal over its assigned spend ceiling, the write may be rejected.
+2. **One Per World:** While an Attempt can have many Evidence records, it has exactly one Attestation per committed `WorldHash`, representing the generation of that specific world. Attestations are immutable: committing again onto an already-attested world keeps the original attestation, and committing a new world records a new attestation without altering earlier ones.
+3. **Unreported Fields:** When an agent does not report `model` or `model_ver`, implementations record the literal `"unknown"` rather than inventing a value; an unreported prompt is recorded as the digest of the empty input.
+4. **Capability Constraints (FR-1.4):** If the `cost_micros` pushes the agent's principal over its assigned spend ceiling, the write may be rejected.

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "coverage payload",
+  "description": "A coverage measurement. Rates are fractions between 0 and 1.",
+  "type": "object",
+  "properties": {
+    "format": {"type": "string"},
+    "line_rate": {"type": "number", "minimum": 0, "maximum": 1},
+    "branch_rate": {"type": "number", "minimum": 0, "maximum": 1},
+    "lines_valid": {"type": "integer", "minimum": 0},
+    "lines_covered": {"type": "integer", "minimum": 0},
+    "branches_valid": {"type": "integer", "minimum": 0},
+    "branches_covered": {"type": "integer", "minimum": 0},
+    "files": {"type": "integer", "minimum": 0},
+    "threshold_percent": {"type": "number", "minimum": 0, "maximum": 100}
+  }
+}

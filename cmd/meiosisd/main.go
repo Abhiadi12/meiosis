@@ -1,3 +1,7 @@
+// Command meiosisd is the long-running meiosis daemon. It serves the agent tools
+// over MCP (stdio, a Unix socket or HTTP) against one repository, with
+// capability enforcement on by default. `mei serve` runs the same code together
+// with the Git server for a single-command first run.
 package main
 
 import (
@@ -11,7 +15,9 @@ import (
 	"syscall"
 
 	"github.com/mindfire-test/meiosis/internal/graph"
+	"github.com/mindfire-test/meiosis/internal/identity"
 	"github.com/mindfire-test/meiosis/internal/mcp"
+	"github.com/mindfire-test/meiosis/internal/server"
 	"github.com/mindfire-test/meiosis/pkg/crypto"
 	"github.com/mindfire-test/meiosis/pkg/storage/sqlite"
 )
@@ -32,7 +38,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	keyPath := fs.String("key", "", "path to this principal's Ed25519 private key (base64 or PEM)")
 	dbPath := fs.String("db", "meiosisd.db", "path to the SQLite database")
 	socketPath := fs.String("socket", "", "optional UNIX socket path to also listen on, in addition to stdio")
-	issuerPubKeyPath := fs.String("issuer-pubkey", "", "path to a trusted issuer's Ed25519 public key (base64 or PEM); when set, every tool call must carry a capability token signed by this issuer (FR-1.3)")
+	issuerPubKeyPath := fs.String("issuer-pubkey", "", "path to a trusted issuer's Ed25519 public key (base64 or PEM); every tool call must carry a capability token signed by this issuer (FR-1.3). Default: human.public.key beside the database, as `mei init` leaves it")
+	allowUnauth := fs.Bool("allow-unauthenticated", false, "serve tool calls without capability tokens. Refused in a repository whose config says strict: true")
 	printVersion := fs.Bool("version", false, "print the meiosisd version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -43,6 +50,10 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	if *principal == "" || *keyPath == "" {
 		return fmt.Errorf("--principal and --key are required")
+	}
+	issuerFile, _, err := server.ResolveEnforcement(*issuerPubKeyPath, *dbPath, *allowUnauth, os.Stderr)
+	if err != nil {
+		return err
 	}
 
 	keyData, err := os.ReadFile(*keyPath)
@@ -62,8 +73,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 
 	server := mcp.NewServer(graph.NewStore(backend), *principal, keys.PrivateKey)
 
-	if *issuerPubKeyPath != "" {
-		pubKeyData, err := os.ReadFile(*issuerPubKeyPath)
+	if issuerFile != "" {
+		pubKeyData, err := os.ReadFile(issuerFile)
 		if err != nil {
 			return fmt.Errorf("read issuer public key: %w", err)
 		}
@@ -72,6 +83,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			return fmt.Errorf("load issuer public key: %w", err)
 		}
 		server.IssuerKey = issuerKey
+		server.Revocation = identity.NewStoreRevocationList(backend)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

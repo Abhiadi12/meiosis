@@ -5,9 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mindfire-test/meiosis/internal/identity"
 	"github.com/mindfire-test/meiosis/pkg/crypto"
+	specv1 "github.com/mindfire-test/meiosis/pkg/spec/v1"
 )
 
 func initRepo(t *testing.T) string {
@@ -219,4 +221,82 @@ func mustRead(t *testing.T, path string) string {
 		t.Fatalf("ReadFile(%s) error = %v", path, err)
 	}
 	return string(data)
+}
+
+func TestInitIgnoresSecretsInGitRepo(t *testing.T) {
+	root := initRepo(t)
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("bin/"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	execute(t, "init", "--repo", root, "--ide", "none")
+	ignore := mustRead(t, filepath.Join(root, ".gitignore"))
+	for _, want := range []string{"bin/", ".meiosis/", ".agents/meiosis-capability.json"} {
+		if !strings.Contains(ignore, want) {
+			t.Fatalf(".gitignore = %q, missing %q", ignore, want)
+		}
+	}
+
+	execute(t, "init", "--repo", root, "--ide", "none")
+	if again := mustRead(t, filepath.Join(root, ".gitignore")); again != ignore {
+		t.Fatalf("second init changed .gitignore:\n%q\n%q", ignore, again)
+	}
+}
+
+func TestInitLeavesNonGitDirectoryWithoutGitignore(t *testing.T) {
+	root := initRepo(t)
+	execute(t, "init", "--repo", root, "--ide", "none")
+	if _, err := os.Stat(filepath.Join(root, ".gitignore")); err == nil {
+		t.Fatal("init created .gitignore outside a git repository")
+	}
+}
+
+func TestInitTokenIsShortLivedAndRepoLevel(t *testing.T) {
+	root := initRepo(t)
+	execute(t, "init", "--repo", root, "--ide", "none")
+	token, err := identity.Decode([]byte(mustRead(t, filepath.Join(root, ".agents", "meiosis-capability.json"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := token.ExpiresAt.Sub(token.IssuedAt); got != identity.DefaultTTL {
+		t.Fatalf("token TTL = %v, want %v (NFR-4.3)", got, identity.DefaultTTL)
+	}
+	if token.Intent != specv1.CapabilityTokenAnyIntent {
+		t.Fatalf("token.Intent = %q, want the repo-level sentinel", token.Intent)
+	}
+}
+
+func TestInitReissuesExpiredToken(t *testing.T) {
+	root := initRepo(t)
+	execute(t, "init", "--repo", root, "--ide", "none", "--ttl", "1ms")
+	tokenPath := filepath.Join(root, ".agents", "meiosis-capability.json")
+	first := mustRead(t, tokenPath)
+	humanKey := mustRead(t, filepath.Join(root, ".meiosis", "human.private.key"))
+	time.Sleep(10 * time.Millisecond)
+
+	output := execute(t, "init", "--repo", root, "--ide", "none")
+	if second := mustRead(t, tokenPath); second == first {
+		t.Fatal("init kept an expired token")
+	}
+	if !strings.Contains(output, "expired") {
+		t.Fatalf("output = %q, want a note about the expired token", output)
+	}
+	if mustRead(t, filepath.Join(root, ".meiosis", "human.private.key")) != humanKey {
+		t.Fatal("re-issuing the token regenerated the human key")
+	}
+}
+
+func TestInitAgentsMDHasNoAbsolutePaths(t *testing.T) {
+	root := initRepo(t)
+	execute(t, "init", "--repo", root, "--ide", "none")
+	md := mustRead(t, filepath.Join(root, ".agents", "AGENTS.md"))
+	if strings.Contains(md, root) || strings.Contains(md, "/home/") || strings.Contains(md, "~/") {
+		t.Fatalf("AGENTS.md leaks a local path:\n%s", md)
+	}
+	if !strings.Contains(md, ".agents/meiosis-capability.json") {
+		t.Fatalf("AGENTS.md does not point at the repo-relative token path:\n%s", md)
+	}
 }

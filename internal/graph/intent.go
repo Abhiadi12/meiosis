@@ -25,27 +25,53 @@ func NewStore(backend storage.Store) *Store {
 
 // CreateIntentParams describes the intent being declared.
 type CreateIntentParams struct {
-	Repo       string
-	Title      string
-	Goal       string
-	Acceptance []specv1.Criterion
-	Scope      specv1.Scope
-	CreatedBy  string // principal declaring the intent
+	Repo        string
+	Title       string
+	Goal        string
+	Acceptance  []specv1.Criterion
+	NonGoals    []string
+	Scope       specv1.Scope
+	ContextPins []specv1.ContextPin
+	Parent      string   // optional IntentID of the parent intent
+	DependsOn   []string // IntentIDs this intent depends on
+	CreatedBy   string   // principal declaring the intent
 }
 
 // CreateIntent builds, signs, persists and returns a new Intent. Its ID is
 // content-derived (specv1.NewContentID) so identical declarations collide
-// onto the same ID rather than minting duplicates.
+// onto the same ID rather than minting duplicates. Every referenced parent and
+// dependency must already exist.
 func (s *Store) CreateIntent(ctx context.Context, p CreateIntentParams, signerKey ed25519.PrivateKey) (specv1.Intent, error) {
+	var intent specv1.Intent
+	err := s.backend.Transaction(ctx, func(tx storage.Tx) error {
+		var err error
+		intent, err = createIntentTx(ctx, tx, p, signerKey, "")
+		return err
+	})
+	if err != nil {
+		return specv1.Intent{}, err
+	}
+	return intent, nil
+}
+
+// createIntentTx creates the intent inside tx. supersedes, when set, is the
+// predecessor this intent replaces: the new intent may not (transitively)
+// depend on it, since that would make it depend on itself (FR-3.7).
+func createIntentTx(ctx context.Context, tx storage.Tx, p CreateIntentParams, signerKey ed25519.PrivateKey, supersedes string) (specv1.Intent, error) {
+	deps := sortedUnique(p.DependsOn)
 	intent := specv1.Intent{
-		Repo:       p.Repo,
-		Title:      p.Title,
-		Goal:       p.Goal,
-		Acceptance: p.Acceptance,
-		Scope:      p.Scope,
-		CreatedBy:  p.CreatedBy,
-		CreatedAt:  time.Now().UTC(),
-		Status:     specv1.IntentStatusOpen,
+		Repo:        p.Repo,
+		Title:       p.Title,
+		Goal:        p.Goal,
+		Acceptance:  p.Acceptance,
+		NonGoals:    p.NonGoals,
+		Scope:       p.Scope,
+		ContextPins: p.ContextPins,
+		Parent:      p.Parent,
+		DependsOn:   deps,
+		CreatedBy:   p.CreatedBy,
+		CreatedAt:   time.Now().UTC(),
+		Status:      specv1.IntentStatusOpen,
 	}
 
 	id, err := specv1.NewContentID("int_", intent)
@@ -61,14 +87,17 @@ func (s *Store) CreateIntent(ctx context.Context, p CreateIntentParams, signerKe
 	intent.Signature = signature
 
 	if validateErr := intent.Validate(); validateErr != nil {
-		return specv1.Intent{}, fmt.Errorf("%w: %v", ErrInvalidParams, validateErr)
+		return specv1.Intent{}, fmt.Errorf("%w: %w", ErrInvalidParams, validateErr)
+	}
+	if err = checkLinks(ctx, tx, intent, supersedes); err != nil {
+		return specv1.Intent{}, err
 	}
 
 	encoded, err := specv1.Canonicalize(intent)
 	if err != nil {
 		return specv1.Intent{}, fmt.Errorf("graph: encode intent: %w", err)
 	}
-	if err := s.backend.Put(ctx, storage.KindIntent, intent.ID, encoded); err != nil {
+	if err = putImmutable(ctx, tx, storage.KindIntent, intent.ID, encoded); err != nil {
 		return specv1.Intent{}, fmt.Errorf("graph: persist intent: %w", err)
 	}
 	return intent, nil
@@ -104,12 +133,9 @@ func (s *Store) ListIntents(ctx context.Context) ([]specv1.Intent, error) {
 	return intents, nil
 }
 
-// SubmitEvidenceParams describes the evidence being submitted.
-//
-// Attempt is taken as-is here: unlike PutEvidence, this predates Attempt
-// persistence and does not check the referenced attempt is active. Kept
-// for callers (the MCP daemon's evidence_submit tool) that build and sign
-// evidence from raw parameters rather than passing an already-signed record.
+// SubmitEvidenceParams describes the evidence being submitted. The referenced
+// attempt must exist and be open; Independent is derived from Producer and the
+// attempt's author, not supplied.
 type SubmitEvidenceParams struct {
 	Attempt   string
 	Producer  string
@@ -119,47 +145,78 @@ type SubmitEvidenceParams struct {
 	Payload   json.RawMessage
 	Footprint []string
 	ExpiresAt time.Time
+	// Supersedes names an earlier record by the same producer, on the same
+	// attempt, that this one corrects (FR-4.12).
+	Supersedes string
 }
 
 // SubmitEvidence builds, signs, persists and returns a new Evidence record.
+// The attempt check, independence computation and write happen in one
+// transaction (FR-4.1, FR-4.4).
 func (s *Store) SubmitEvidence(ctx context.Context, p SubmitEvidenceParams, signerKey ed25519.PrivateKey) (specv1.Evidence, error) {
 	evidence := specv1.Evidence{
-		Attempt:   p.Attempt,
-		World:     p.World,
-		Kind:      p.Kind,
-		Producer:  p.Producer,
-		Outcome:   p.Outcome,
-		Footprint: p.Footprint,
-		Payload:   p.Payload,
-		ExpiresAt: p.ExpiresAt,
-		CreatedAt: time.Now().UTC(),
+		Attempt:    p.Attempt,
+		World:      p.World,
+		Kind:       p.Kind,
+		Producer:   p.Producer,
+		Outcome:    p.Outcome,
+		Footprint:  p.Footprint,
+		Payload:    p.Payload,
+		ExpiresAt:  p.ExpiresAt,
+		Supersedes: p.Supersedes,
+		CreatedAt:  time.Now().UTC(),
 	}
 
-	// Evidence.ID has no mandated format (spec/v1/evidence.md just calls it a
-	// "unique identifier"), but a content-derived ID keeps it consistent with
-	// Intent's scheme rather than inventing a second convention.
-	id, err := specv1.NewContentID("evd_", evidence)
+	// Reject malformed input before touching storage. ID and signature are
+	// filled in below, so stand-ins satisfy Validate here.
+	preflight := evidence
+	preflight.ID, preflight.Signature = "pending", "pending"
+	if err := preflight.Validate(); err != nil {
+		return specv1.Evidence{}, fmt.Errorf("%w: %w", ErrInvalidParams, err)
+	}
+
+	err := s.backend.Transaction(ctx, func(tx storage.Tx) error {
+		attempt, err := loadActiveAttempt(ctx, tx, p.Attempt)
+		if err != nil {
+			return err
+		}
+		evidence.Independent = evidence.Producer != attempt.Author
+		if err = validatePayload(ctx, tx, evidence.Kind, evidence.Payload); err != nil {
+			return err
+		}
+		if err = checkSupersedes(ctx, tx, evidence); err != nil {
+			return err
+		}
+
+		// Evidence.ID has no mandated format (spec/v1/evidence.md just calls
+		// it a "unique identifier"), but a content-derived ID keeps it
+		// consistent with Intent's scheme.
+		id, err := specv1.NewContentID("evd_", evidence)
+		if err != nil {
+			return fmt.Errorf("graph: generate evidence id: %w", err)
+		}
+		evidence.ID = id
+
+		signature, err := crypto.Sign(evidence, signerKey)
+		if err != nil {
+			return fmt.Errorf("graph: sign evidence: %w", err)
+		}
+		evidence.Signature = signature
+
+		if validateErr := evidence.Validate(); validateErr != nil {
+			return fmt.Errorf("%w: %w", ErrInvalidParams, validateErr)
+		}
+		encoded, err := specv1.Canonicalize(evidence)
+		if err != nil {
+			return fmt.Errorf("graph: encode evidence: %w", err)
+		}
+		if err := putImmutable(ctx, tx, storage.KindEvidence, evidence.ID, encoded); err != nil {
+			return fmt.Errorf("graph: persist evidence: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return specv1.Evidence{}, fmt.Errorf("graph: generate evidence id: %w", err)
-	}
-	evidence.ID = id
-
-	signature, err := crypto.Sign(evidence, signerKey)
-	if err != nil {
-		return specv1.Evidence{}, fmt.Errorf("graph: sign evidence: %w", err)
-	}
-	evidence.Signature = signature
-
-	if validateErr := evidence.Validate(); validateErr != nil {
-		return specv1.Evidence{}, fmt.Errorf("%w: %v", ErrInvalidParams, validateErr)
-	}
-
-	encoded, err := specv1.Canonicalize(evidence)
-	if err != nil {
-		return specv1.Evidence{}, fmt.Errorf("graph: encode evidence: %w", err)
-	}
-	if err := s.backend.Put(ctx, storage.KindEvidence, evidence.ID, encoded); err != nil {
-		return specv1.Evidence{}, fmt.Errorf("graph: persist evidence: %w", err)
+		return specv1.Evidence{}, err
 	}
 	return evidence, nil
 }

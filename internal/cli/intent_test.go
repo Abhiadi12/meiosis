@@ -8,6 +8,7 @@ import (
 
 	"github.com/mindfire-test/meiosis/internal/identity"
 	"github.com/mindfire-test/meiosis/pkg/crypto"
+	"github.com/mindfire-test/meiosis/pkg/storage/sqlite"
 )
 
 func writeIssuerKey(t *testing.T) (crypto.KeyPair, string) {
@@ -118,5 +119,43 @@ func TestIntentDeclareRequiresTitle(t *testing.T) {
 	command.SetArgs([]string{"intent", "declare"})
 	if err := command.Execute(); err == nil {
 		t.Fatal("Execute() expected an error for a missing title")
+	}
+}
+
+func TestIntentRevokeRecordsTokenInStore(t *testing.T) {
+	root := initRepo(t)
+	execute(t, "init", "--repo", root, "--ide", "none")
+	tokenPath := filepath.Join(root, ".agents", "meiosis-capability.json")
+	token, err := identity.Decode([]byte(mustRead(t, tokenPath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output := execute(t, "intent", "revoke", "--repo", root, "--token", tokenPath)
+	if !strings.Contains(output, token.ID) {
+		t.Fatalf("output = %q, want the revoked token id", output)
+	}
+	// Idempotent.
+	execute(t, "intent", "revoke", "--repo", root, token.ID)
+
+	store, err := sqlite.Open(filepath.Join(root, ".meiosis", "meiosisd.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if !identity.NewStoreRevocationList(store).IsRevoked(token.ID) {
+		t.Fatal("token is not revoked in the store after `mei intent revoke`")
+	}
+}
+
+func TestIntentRevokeRequiresExactlyOneTarget(t *testing.T) {
+	root := initRepo(t)
+	execute(t, "init", "--repo", root, "--ide", "none")
+	command := New(nil)
+	command.SetOut(&strings.Builder{})
+	command.SetErr(&strings.Builder{})
+	command.SetArgs([]string{"intent", "revoke", "--repo", root})
+	if err := command.Execute(); err == nil {
+		t.Fatal("revoke with no target succeeded")
 	}
 }

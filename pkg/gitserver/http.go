@@ -4,7 +4,6 @@ package gitserver
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,15 +11,25 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 // Handler serves repositories from ProjectRoot through Git's smart HTTP
 // backend. The backend supports both upload-pack and receive-pack operations.
+//
+// Responses are streamed: a clone's pack goes to the client as git produces it
+// and is never held whole in memory.
 type Handler struct {
 	ProjectRoot string
 	GitBinary   string
+	// ExtraEnv, if set, returns extra environment variables ("KEY=value") for the
+	// git process serving r. The server uses it to tell the receive hooks who is
+	// pushing.
+	ExtraEnv func(r *http.Request) []string
+	// Logf, if set, receives diagnostics from the git process.
+	Logf func(format string, args ...any)
 }
 
 // NewHandler creates a smart HTTP handler rooted at projectRoot. Repositories
@@ -32,8 +41,8 @@ func NewHandler(projectRoot string) (*Handler, error) {
 	}
 	if projectRoot == "" {
 		projectRoot = root
-	} else if !path.IsAbs(projectRoot) {
-		projectRoot = path.Join(root, projectRoot)
+	} else if !filepath.IsAbs(projectRoot) {
+		projectRoot = filepath.Join(root, projectRoot)
 	}
 	return &Handler{ProjectRoot: projectRoot, GitBinary: "git"}, nil
 }
@@ -48,18 +57,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	output, err := h.runBackend(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := writeCGIResponse(w, output); err != nil {
-		return
+	if err := h.serve(w, r); err != nil {
+		h.logf("git http-backend for %s %s: %v", r.Method, r.URL.Path, err)
 	}
 }
 
-func (h *Handler) runBackend(r *http.Request) ([]byte, error) {
+func (h *Handler) logf(format string, args ...any) {
+	if h.Logf != nil {
+		h.Logf(format, args...)
+	}
+}
+
+// serve runs git http-backend for r and relays its CGI response. An error
+// before any output is sent becomes a 500; after that the status is already
+// committed and the error is only returned for logging.
+func (h *Handler) serve(w http.ResponseWriter, r *http.Request) error {
 	gitBinary := h.GitBinary
 	if gitBinary == "" {
 		gitBinary = "git"
@@ -69,10 +81,36 @@ func (h *Handler) runBackend(r *http.Request) ([]byte, error) {
 	// boundary in front of this handler.
 	cmd := exec.CommandContext(r.Context(), gitBinary, "-c", "http.receivepack=true", "http-backend")
 	cmd.Stdin = r.Body
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	cmd.Stderr = &output
+	var stderr limitedBuffer
+	cmd.Stderr = &stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return err
+	}
+	cmd.Env = h.environment(r)
+	if err = cmd.Start(); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return fmt.Errorf("start git http-backend: %w", err)
+	}
 
+	reader := bufio.NewReaderSize(stdout, 1<<16)
+	copyErr := relayCGI(w, reader)
+	if copyErr != nil {
+		// The client went away or the response was malformed: stop git.
+		_ = stdout.Close()
+	}
+	waitErr := cmd.Wait()
+	if copyErr != nil {
+		return copyErr
+	}
+	if waitErr != nil {
+		return fmt.Errorf("%w: %s", waitErr, strings.TrimSpace(stderr.String()))
+	}
+	return nil
+}
+
+func (h *Handler) environment(r *http.Request) []string {
 	env := append([]string{}, os.Environ()...)
 	setEnv := func(key, value string) {
 		prefix := key + "="
@@ -90,57 +128,62 @@ func (h *Handler) runBackend(r *http.Request) ([]byte, error) {
 	setEnv("REQUEST_METHOD", r.Method)
 	setEnv("QUERY_STRING", r.URL.RawQuery)
 	setEnv("CONTENT_TYPE", r.Header.Get("Content-Type"))
-	setEnv("CONTENT_LENGTH", contentLength(r))
+	// A request body of unknown length (chunked) has no CONTENT_LENGTH; git then
+	// reads it to the end.
+	if r.ContentLength >= 0 {
+		setEnv("CONTENT_LENGTH", strconv.FormatInt(r.ContentLength, 10))
+	}
 	setEnv("REMOTE_ADDR", r.RemoteAddr)
 	setEnv("SERVER_PROTOCOL", r.Proto)
 	setEnv("HTTP_HOST", r.Host)
 	for key, values := range r.Header {
-		if len(values) == 0 {
-			continue
+		if len(values) == 0 || strings.EqualFold(key, "Authorization") || strings.EqualFold(key, "Cookie") {
+			continue // credentials are the server's business, not git's
 		}
-		envKey := "HTTP_" + strings.ReplaceAll(strings.ToUpper(key), "-", "_")
-		setEnv(envKey, strings.Join(values, ","))
+		setEnv("HTTP_"+strings.ReplaceAll(strings.ToUpper(key), "-", "_"), strings.Join(values, ","))
 	}
-	cmd.Env = env
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("git http-backend: %w: %s", err, output.String())
+	if h.ExtraEnv != nil {
+		for _, kv := range h.ExtraEnv(r) {
+			if key, value, ok := strings.Cut(kv, "="); ok {
+				setEnv(key, value)
+			}
+		}
 	}
-	return output.Bytes(), nil
+	return env
 }
 
-func contentLength(r *http.Request) string {
-	if r.ContentLength >= 0 {
-		return strconv.FormatInt(r.ContentLength, 10)
+// limitedBuffer keeps the first few KiB of what is written to it.
+type limitedBuffer struct{ buf []byte }
+
+const limitedBufferMax = 8 << 10
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if room := limitedBufferMax - len(b.buf); room > 0 {
+		b.buf = append(b.buf, p[:min(room, len(p))]...)
 	}
-	return r.Header.Get("Content-Length")
+	return len(p), nil
 }
 
-func validatePath(requestPath string) error {
-	if requestPath == "" || !strings.HasPrefix(requestPath, "/") {
-		return fmt.Errorf("invalid repository path")
-	}
-	clean := path.Clean(requestPath)
-	if clean != requestPath || strings.Contains(requestPath, "..") {
-		return fmt.Errorf("invalid repository path")
-	}
-	return nil
-}
+func (b *limitedBuffer) String() string { return string(b.buf) }
 
-func writeCGIResponse(w http.ResponseWriter, output []byte) error {
-	reader := bufio.NewReader(bytes.NewReader(output))
+// relayCGI reads a CGI response (headers, blank line, body) and writes it to w,
+// flushing as the body arrives.
+func relayCGI(w http.ResponseWriter, reader *bufio.Reader) error {
 	header, err := textproto.NewReader(reader).ReadMIMEHeader()
 	if err != nil {
+		http.Error(w, "bad gateway", http.StatusBadGateway)
 		return fmt.Errorf("parse git http-backend headers: %w", err)
 	}
 	status := http.StatusOK
 	if value := header.Get("Status"); value != "" {
 		fields := strings.Fields(value)
 		if len(fields) == 0 {
+			http.Error(w, "bad gateway", http.StatusBadGateway)
 			return fmt.Errorf("empty git http-backend status")
 		}
 		code, parseErr := strconv.Atoi(fields[0])
 		if parseErr != nil {
+			http.Error(w, "bad gateway", http.StatusBadGateway)
 			return fmt.Errorf("parse git http-backend status: %w", parseErr)
 		}
 		status = code
@@ -154,8 +197,37 @@ func writeCGIResponse(w http.ResponseWriter, output []byte) error {
 		}
 	}
 	w.WriteHeader(status)
-	_, err = io.Copy(w, reader)
-	return err
+
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 32<<10)
+	for {
+		n, readErr := reader.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if readErr == io.EOF {
+			return nil
+		}
+		if readErr != nil {
+			return readErr
+		}
+	}
+}
+
+func validatePath(requestPath string) error {
+	if requestPath == "" || !strings.HasPrefix(requestPath, "/") {
+		return fmt.Errorf("invalid repository path")
+	}
+	clean := path.Clean(requestPath)
+	if clean != requestPath || strings.Contains(requestPath, "..") {
+		return fmt.Errorf("invalid repository path")
+	}
+	return nil
 }
 
 var _ http.Handler = (*Handler)(nil)

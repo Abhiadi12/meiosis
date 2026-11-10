@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"path"
 	"sort"
 	"strings"
@@ -121,31 +122,89 @@ func (w World) Diff(ctx context.Context, other World) ([]Change, error) {
 }
 
 func hashFiles(files map[string][]byte) (specv1.WorldHash, error) {
-	// This is a temporary deterministic file-tree encoding. The eventual
-	// zygote/vfs adapter will own production Merkle-tree semantics.
 	paths := make([]string, 0, len(files))
 	for filePath := range files {
-		if err := validatePath(filePath); err != nil {
-			return specv1.WorldHash{}, err
-		}
 		paths = append(paths, filePath)
 	}
 	sort.Strings(paths)
-	hasher := blake3.New()
-	var length [8]byte
+	hasher := NewHasher()
 	for _, filePath := range paths {
-		content := files[filePath]
-		binary.BigEndian.PutUint64(length[:], uint64(len(filePath)))
-		_, _ = hasher.Write(length[:])
-		_, _ = hasher.Write([]byte(filePath))
-		binary.BigEndian.PutUint64(length[:], uint64(len(content)))
-		_, _ = hasher.Write(length[:])
-		_, _ = hasher.Write(content)
+		if err := hasher.Add(filePath, files[filePath]); err != nil {
+			return specv1.WorldHash{}, err
+		}
 	}
-	digest := hasher.Sum(nil)
+	return hasher.Sum(), nil
+}
+
+// Hasher computes a world hash incrementally, one file at a time, so a large
+// tree can be hashed without holding it in memory. Feeding it the files of a
+// tree in order gives exactly the hash New gives for that tree: the encoding is
+// a temporary one until zygote/vfs owns production Merkle-tree semantics.
+type Hasher struct {
+	hasher *blake3.Hasher
+	last   string
+	count  int
+}
+
+// EmptyTreeHash is the world hash of a tree with no files.
+func EmptyTreeHash() specv1.WorldHash { return NewHasher().Sum() }
+
+// NewHasher returns an empty Hasher.
+func NewHasher() *Hasher { return &Hasher{hasher: blake3.New()} }
+
+// Add hashes one file. Paths must be valid and added in strictly increasing
+// byte order, which makes the result independent of how the caller walked the
+// tree.
+func (h *Hasher) Add(filePath string, content []byte) error {
+	if err := validatePath(filePath); err != nil {
+		return err
+	}
+	if h.count > 0 && filePath <= h.last {
+		return fmt.Errorf("%w: %q is not after %q", ErrUnordered, filePath, h.last)
+	}
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(filePath)))
+	_, _ = h.hasher.Write(length[:])
+	_, _ = h.hasher.Write([]byte(filePath))
+	binary.BigEndian.PutUint64(length[:], uint64(len(content)))
+	_, _ = h.hasher.Write(length[:])
+	_, _ = h.hasher.Write(content)
+	h.last = filePath
+	h.count++
+	return nil
+}
+
+// AddStream is Add for content that is read rather than held: size bytes are
+// copied from r straight into the hash, so a large file never sits in memory.
+func (h *Hasher) AddStream(filePath string, size int64, r io.Reader) error {
+	if err := validatePath(filePath); err != nil {
+		return err
+	}
+	if h.count > 0 && filePath <= h.last {
+		return fmt.Errorf("%w: %q is not after %q", ErrUnordered, filePath, h.last)
+	}
+	if size < 0 {
+		return fmt.Errorf("worlds: negative size for %q", filePath)
+	}
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(filePath)))
+	_, _ = h.hasher.Write(length[:])
+	_, _ = h.hasher.Write([]byte(filePath))
+	binary.BigEndian.PutUint64(length[:], uint64(size))
+	_, _ = h.hasher.Write(length[:])
+	if n, err := io.CopyN(h.hasher, r, size); err != nil {
+		return fmt.Errorf("worlds: read %q: got %d of %d bytes: %w", filePath, n, size, err)
+	}
+	h.last = filePath
+	h.count++
+	return nil
+}
+
+// Sum returns the world hash of the files added so far.
+func (h *Hasher) Sum() specv1.WorldHash {
 	var hash specv1.WorldHash
-	copy(hash[:], digest)
-	return hash, nil
+	copy(hash[:], h.hasher.Sum(nil))
+	return hash
 }
 
 func validatePath(filePath string) error {

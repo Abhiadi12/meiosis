@@ -1,6 +1,10 @@
 package cli
 
 import (
+	"bytes"
+	"crypto/ed25519"
+	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +13,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,16 +23,11 @@ import (
 	specv1 "github.com/mindfire-test/meiosis/pkg/spec/v1"
 )
 
-// bootstrapIntent is the placeholder intent ID stamped on tokens issued by
-// `mei init`. The daemon does not resolve it: a capability token is a grant,
-// not a reference to a persisted intent, and the real intent's scope is still
-// enforced separately when it is created over MCP.
-const bootstrapIntent = "int_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-// initTokenTTL is how long the bootstrap capability token lives. Longer than
-// identity.DefaultTTL so a freshly initialized repo does not leave its agent
-// locked out the next morning, but still finite for the same reason.
-const initTokenTTL = 30 * 24 * time.Hour
+// initTokenTTL is how long the bootstrap capability token lives. It matches
+// identity.DefaultTTL (NFR-4.3: short-lived by default). Re-running `mei init`
+// issues a fresh token once the existing one has expired, and --ttl lengthens
+// it for unattended setups.
+const initTokenTTL = identity.DefaultTTL
 
 // initDefaults keeps the few tunables of the bootstrap in one place.
 const (
@@ -45,6 +45,7 @@ type initOptions struct {
 	ttl    time.Duration
 	allow  []string
 	deny   []string
+	strict bool
 }
 
 // newInitCommand builds the "init" command tree: repo-local bootstrap
@@ -53,7 +54,7 @@ type initOptions struct {
 // It is the git-init equivalent for a meiosis repo: one command, idempotent,
 // nothing for the user to hand-edit.
 func newInitCommand(settings *Settings) *cobra.Command {
-	opts := &initOptions{ttl: initTokenTTL}
+	opts := &initOptions{ttl: initTokenTTL, strict: true}
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -83,6 +84,7 @@ Run it again to repair a partial setup. --force regenerates secrets.
 	flags.BoolVar(&opts.force, "force", false, "regenerate secrets and overwrite generated files")
 	flags.BoolVar(&opts.dryRun, "dry-run", false, "print what would be written without writing anything")
 	flags.DurationVar(&opts.ttl, "ttl", initTokenTTL, "capability token lifetime")
+	flags.BoolVar(&opts.strict, "strict", true, "record strict mode in the repository config: the daemon will refuse to run without capability enforcement")
 	flags.StringArrayVar(&opts.allow, "allow", nil, "glob the bootstrap token may touch (repeatable; default **)")
 	flags.StringArrayVar(&opts.deny, "deny", nil, "glob the bootstrap token may not touch, even if allowed (repeatable)")
 
@@ -119,7 +121,7 @@ func runInit(out io.Writer, opts *initOptions) error {
 
 	writer := &bootstrapWriter{out: out, dry: opts.dryRun}
 
-	if writeErr := writeConfigFile(writer, filepath.Join(meiosisDir, "config.yaml"), opts.force); writeErr != nil {
+	if writeErr := writeConfigFile(writer, filepath.Join(meiosisDir, "config.yaml"), opts.force, opts.strict); writeErr != nil {
 		return writeErr
 	}
 
@@ -127,13 +129,16 @@ func runInit(out io.Writer, opts *initOptions) error {
 	if err != nil {
 		return err
 	}
-	agentKeys, err := ensureKeyPair(writer, agentPriv, "", opts.force)
+	agentKeys, err := ensureKeyPair(writer, agentPriv, filepath.Join(meiosisDir, "agent.public.key"), opts.force)
 	if err != nil {
 		return err
 	}
-	_ = agentKeys
 
-	token, err := ensureToken(writer, tokenPath, humanKeys, opts, agent, issuer)
+	if err = ensureGitignore(writer, root); err != nil {
+		return err
+	}
+
+	token, err := ensureToken(writer, tokenPath, humanKeys, agentKeys.PublicKey, opts, agent, issuer)
 	if err != nil {
 		return err
 	}
@@ -181,8 +186,8 @@ func (w *bootstrapWriter) write(path string, data []byte, perm os.FileMode, forc
 	return nil
 }
 
-func writeConfigFile(w *bootstrapWriter, path string, force bool) error {
-	content := "repo: .\nformat: text\nverbose: false\n"
+func writeConfigFile(w *bootstrapWriter, path string, force, strict bool) error {
+	content := fmt.Sprintf("repo: .\nformat: text\nverbose: false\nstrict: %t\n# Credentials found in pushes: off, warn or block (block refuses pushes with high-confidence matches).\nsecrets: warn\n", strict)
 	if _, err := os.Stat(path); err == nil {
 		if !force {
 			_, _ = fmt.Fprintf(w.out, "exists:  %s\n", relHome(path))
@@ -228,14 +233,25 @@ func ensureKeyPair(w *bootstrapWriter, privPath, pubPath string, force bool) (cr
 	return keys, nil
 }
 
-func ensureToken(w *bootstrapWriter, tokenPath string, human crypto.KeyPair, opts *initOptions, agent, issuer string) (specv1.CapabilityToken, error) {
+func ensureToken(w *bootstrapWriter, tokenPath string, human crypto.KeyPair, agentPub ed25519.PublicKey, opts *initOptions, agent, issuer string) (specv1.CapabilityToken, error) {
 	if data, err := os.ReadFile(tokenPath); err == nil && !opts.force {
 		token, err := identity.Decode(data)
 		if err != nil {
 			return specv1.CapabilityToken{}, fmt.Errorf("init: decode existing token %s: %w", tokenPath, err)
 		}
-		_, _ = fmt.Fprintf(w.out, "exists:  %s\n", relHome(tokenPath))
-		return token, nil
+		// A token that names no holder key, or the wrong one, could not be
+		// delegated from, so it is replaced along with an expired one.
+		holderOK := len(agentPub) == 0 || token.HolderKey == base64.StdEncoding.EncodeToString(agentPub)
+		if !token.Expired(time.Now()) && holderOK {
+			_, _ = fmt.Fprintf(w.out, "exists:  %s\n", relHome(tokenPath))
+			return token, nil
+		}
+		reason := "expired"
+		if !holderOK {
+			reason = "has no holder key for this agent, so it could not be delegated"
+		}
+		_, _ = fmt.Fprintf(w.out, "replacing: %s (%s)\n", relHome(tokenPath), reason)
+		opts = &initOptions{repo: opts.repo, ide: opts.ide, agent: opts.agent, issuer: opts.issuer, dryRun: opts.dryRun, ttl: opts.ttl, allow: opts.allow, deny: opts.deny, force: true}
 	}
 
 	if opts.dryRun {
@@ -249,10 +265,11 @@ func ensureToken(w *bootstrapWriter, tokenPath string, human crypto.KeyPair, opt
 	}
 	token, err := identity.Issue(identity.IssueParams{
 		Principal: agent,
-		Intent:    bootstrapIntent,
+		Intent:    specv1.CapabilityTokenAnyIntent,
 		IssuedBy:  issuer,
 		Scope:     specv1.Scope{Allow: allow, Deny: opts.deny, Mode: specv1.ScopeModeEnforce},
 		TTL:       opts.ttl,
+		HolderKey: agentPub,
 	}, human.PrivateKey)
 	if err != nil {
 		return specv1.CapabilityToken{}, fmt.Errorf("init: issue capability token: %w", err)
@@ -268,6 +285,14 @@ func ensureToken(w *bootstrapWriter, tokenPath string, human crypto.KeyPair, opt
 	return token, nil
 }
 
+// agentsTemplate is the instruction file written to .agents/AGENTS.md. It lives
+// in templates/ as a real Markdown file so it can be read and edited as one.
+//
+//go:embed templates/agents.md.tmpl
+var agentsTemplateText string
+
+var agentsTemplate = template.Must(template.New("agents.md").Option("missingkey=error").Parse(agentsTemplateText))
+
 func writeAgentsMD(w *bootstrapWriter, path, tokenPath, agentsDir string, force bool, opts *initOptions) error {
 	allow := strings.Join(opts.allow, ", ")
 	if allow == "" {
@@ -279,51 +304,23 @@ func writeAgentsMD(w *bootstrapWriter, path, tokenPath, agentsDir string, force 
 	}
 	scope := fmt.Sprintf("allows: %s ; denies: %s", allow, deny)
 
-	// Written with a {{TOKEN_FIELD}} placeholder because the rendered text
-	// contains backticks, which cannot appear inside a raw string literal.
-	content := fmt.Sprintf(`# Meiosis MCP tools
+	// Paths in the generated file are relative to the repository root so the
+	// file is portable between machines and never leaks the local home dir.
+	relToken := tokenPath
+	if rel, relErr := filepath.Rel(filepath.Dir(agentsDir), tokenPath); relErr == nil {
+		relToken = filepath.ToSlash(rel)
+	}
 
-This repository is governed by meiosis — source control where evidence
-expires. The daemon (meiosisd) exposes its tools over MCP; any agent in this
-workspace may call them.
-
-## MCP server
-
-- server: %s (registered in the IDE global MCP config)
-- tools: intent_create, intent_check_path, evidence_submit
-
-## Mandatory rule: every tool call must carry a capability token
-
-The daemon runs with capability enforcement ON. A call whose arguments object
-lacks a {{TOKEN_FIELD}} field is rejected. Read the token from
-%s (relative to the repo root) and embed it as a JSON object, not a string.
-
-For intent_check_path and evidence_submit the token must also cover the exact
-path/paths you pass. This token's scope — %s — is enforced there and at any
-real write path. If a call is rejected for a path, do not retry: it is out of
-scope by design. Ask the human to issue a wider token with:
-    mei intent authorize --issuer human:<you> --allow '<glob>' ...
-
-## Example
-
-Call intent_create with:
-
-{
-  "repo": "%s",
-  "title": "Refactor UI component",
-  "goal": "Update the Button component safely",
-  "acceptance": [{"text": "Component tests pass"}],
-  "scope": {"allow": ["src/components/**"], "deny": ["pkg/auth/**"], "mode": "enforce"},
-  "{{TOKEN_FIELD}}": <object from %s>
-}
-`, initServerName, relHome(tokenPath), scope, ".", tokenPath)
-	content = strings.ReplaceAll(content, "{{TOKEN_FIELD}}", "`capability_token`")
+	var content bytes.Buffer
+	if err := agentsTemplate.Execute(&content, map[string]string{"Server": initServerName, "Token": relToken, "Scope": scope}); err != nil {
+		return fmt.Errorf("init: render AGENTS.md: %w", err)
+	}
 
 	if _, err := os.Stat(path); err == nil && !force {
 		_, _ = fmt.Fprintf(w.out, "exists:  %s\n", relHome(path))
 		return nil
 	}
-	return w.write(path, []byte(content), 0o644, force)
+	return w.write(path, content.Bytes(), 0o644, force)
 }
 
 // ensureDaemonBinary builds bin/meiosisd when it is missing and a Go module
@@ -566,4 +563,57 @@ func relHome(path string) string {
 		return "~/" + relative
 	}
 	return path
+}
+
+// secretIgnoreEntries are the generated files that hold private key material
+// or live credentials and must never be committed.
+var secretIgnoreEntries = []string{".meiosis/", ".agents/meiosis-capability.json"}
+
+// ensureGitignore appends any missing secretIgnoreEntries to the repository's
+// .gitignore. It does nothing outside a git repository (no .git and no
+// .gitignore), and never rewrites existing lines.
+func ensureGitignore(w *bootstrapWriter, root string) error {
+	path := filepath.Join(root, ".gitignore")
+	existing, readErr := os.ReadFile(path)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return fmt.Errorf("init: read %s: %w", path, readErr)
+	}
+	if os.IsNotExist(readErr) {
+		if _, statErr := os.Stat(filepath.Join(root, ".git")); statErr != nil {
+			return nil
+		}
+	}
+
+	have := map[string]bool{}
+	for _, line := range strings.Split(string(existing), "\n") {
+		have[strings.TrimSpace(line)] = true
+	}
+	var missing []string
+	for _, entry := range secretIgnoreEntries {
+		if !have[entry] && !have[strings.TrimSuffix(entry, "/")] {
+			missing = append(missing, entry)
+		}
+	}
+	if len(missing) == 0 {
+		_, _ = fmt.Fprintf(w.out, "exists:  %s (secrets already ignored)\n", relHome(path))
+		return nil
+	}
+	if w.dry {
+		_, _ = fmt.Fprintf(w.out, "would update: %s (ignore %s)\n", relHome(path), strings.Join(missing, ", "))
+		return nil
+	}
+	var b strings.Builder
+	b.Write(existing)
+	if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
+		b.WriteString("\n")
+	}
+	b.WriteString("\n# meiosis: private keys and capability tokens\n")
+	for _, entry := range missing {
+		b.WriteString(entry + "\n")
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return fmt.Errorf("init: write %s: %w", path, err)
+	}
+	_, _ = fmt.Fprintf(w.out, "updated: %s (ignore %s)\n", relHome(path), strings.Join(missing, ", "))
+	return nil
 }

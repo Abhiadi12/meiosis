@@ -1,0 +1,12 @@
+{
+  "id": "evidence-6",
+  "attempt": "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "kind": "test-run",
+  "producer": "agent:ci",
+  "supersedes": "evidence-6",
+  "outcome": "pass",
+  "payload": {},
+  "created_at": "2026-09-02T12:20:00Z",
+  "signature": "c2lnbmF0dXJl"
+}

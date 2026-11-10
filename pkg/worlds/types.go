@@ -12,6 +12,7 @@ var (
 	ErrNilTree      = errors.New("world tree must not be nil")
 	ErrInvalidPath  = errors.New("invalid world path")
 	ErrMissingWorld = errors.New("world is not initialized")
+	ErrUnordered    = errors.New("world files must be added in increasing path order")
 )
 
 // Tree is the narrow boundary between Meiosis and a tree implementation such

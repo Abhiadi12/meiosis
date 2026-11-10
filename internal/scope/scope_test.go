@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestIntentIsAllowed(t *testing.T) {
+func TestIntentIsPathAllowed(t *testing.T) {
 	tests := []struct {
 		name    string
 		intent  Intent
@@ -89,22 +89,15 @@ func TestIntentIsAllowed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.intent.IsAllowed(tt.path)
+			got, err := tt.intent.IsPathAllowed(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Intent.IsAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Intent.IsPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("Intent.IsAllowed() = %v, want %v", got, tt.want)
+				t.Errorf("Intent.IsPathAllowed() = %v, want %v", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestIsPathAllowedFunction(t *testing.T) {
-	allowed, err := IsPathAllowed(Intent{Allow: []string{"**/*.go"}}, "internal/scope/scope.go")
-	if err != nil || !allowed {
-		t.Fatalf("IsPathAllowed() = %v, %v; want true, nil", allowed, err)
 	}
 }
 

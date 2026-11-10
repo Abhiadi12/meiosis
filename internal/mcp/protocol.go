@@ -45,6 +45,11 @@ const (
 type rpcError struct {
 	code    int
 	message string
+	// cause, when set, is the underlying error. It lets the HTTP API pick a
+	// status code by what went wrong (an expired token, a scope refusal)
+	// instead of by parsing the message.
+	cause error
 }
 
 func (e *rpcError) Error() string { return e.message }
+func (e *rpcError) Unwrap() error { return e.cause }

@@ -1,3 +1,7 @@
+// Package crypto holds the Ed25519 key handling and signing used across
+// meiosis: PEM key files, and signatures over the RFC 8785 canonical form of any
+// spec/v1 object. It has no dependency on the rest of the implementation, so a
+// second implementation can reproduce it from the spec alone.
 package crypto
 
 import (
@@ -103,7 +107,7 @@ func decodePrivateKey(value string) ([]byte, error) {
 	if block, _ := pem.Decode([]byte(value)); block != nil {
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("%w: parse private key PEM: %v", ErrInvalidKey, err)
+			return nil, fmt.Errorf("%w: parse private key PEM: %w", ErrInvalidKey, err)
 		}
 		private, ok := key.(ed25519.PrivateKey)
 		if !ok {
@@ -118,7 +122,7 @@ func decodePublicKey(value string) ([]byte, error) {
 	if block, _ := pem.Decode([]byte(value)); block != nil {
 		key, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("%w: parse public key PEM: %v", ErrInvalidKey, err)
+			return nil, fmt.Errorf("%w: parse public key PEM: %w", ErrInvalidKey, err)
 		}
 		public, ok := key.(ed25519.PublicKey)
 		if !ok {
@@ -135,7 +139,7 @@ func decodeBase64Key(value, kind string) ([]byte, error) {
 		data, err = base64.RawStdEncoding.DecodeString(value)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: decode %s key: %v", ErrInvalidKey, kind, err)
+		return nil, fmt.Errorf("%w: decode %s key: %w", ErrInvalidKey, kind, err)
 	}
 	return data, nil
 }

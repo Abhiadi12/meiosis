@@ -1,0 +1,3 @@
+{"Action":"build-output","Package":"ex/bad","Output":"syntax error\n"}
+{"Action":"build-fail","Package":"ex/bad"}
+{"Action":"fail","Package":"ex/bad","Elapsed":0}

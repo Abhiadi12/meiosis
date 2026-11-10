@@ -61,3 +61,12 @@ func TestIsPathAllowedRejectsInvalidPattern(t *testing.T) {
 		t.Fatal("IsPathAllowed() expected error for malformed glob pattern")
 	}
 }
+
+func TestEngineRejectsUnsafePaths(t *testing.T) {
+	e := New(specv1.Scope{Allow: []string{"**"}, Mode: specv1.ScopeModeEnforce})
+	for _, path := range []string{"", "/etc/passwd", "../secret", "pkg/../secret"} {
+		if allowed, err := e.IsPathAllowed(path); err == nil || allowed {
+			t.Errorf("IsPathAllowed(%q) = %v, %v; want false and an error", path, allowed, err)
+		}
+	}
+}

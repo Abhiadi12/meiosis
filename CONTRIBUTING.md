@@ -11,17 +11,26 @@ First off, thank you for considering contributing to meiosis! Contributions are 
    ```bash
    ./scripts/install-hooks.sh
    ```
-5. **Install dependencies** and run tests to ensure everything is working:
+5. **Check everything works** (needs `git`, Go, and `golangci-lint`; `lsof` makes the air-gap check run):
    ```bash
-   make test
-   make lint
+   make check      # formatting, vet, lint, go.mod tidy, tests with -race
+   make help       # every target: acceptance, cover, fuzz, bench, vectors, cross, vuln
    ```
+
+## Where things go
+
+Read [`docs/architecture.md`](docs/architecture.md) first. In short: `pkg/` is the
+importable, stable part; `internal/` is everything else; dependencies point one
+way, and `internal/architecture` fails the build if a package imports what it
+must not. A change to an object, tool or flag updates `spec/v1`, `docs/api.md` or
+the agent instructions (`internal/cli/templates/agents.md.tmpl`) in the same pull
+request.
 
 ## Ground Rules & Core Philosophy
 
 - **Cgo-Free Portability:** `meiosis` must remain a 100% pure Go codebase (`CGO_ENABLED=0`). Do not introduce C dependencies. We use `modernc.org/sqlite` instead of `mattn/go-sqlite3`.
 - **The proof is the work:** Every logical change should be backed by tests. 
-- **Code style:** We enforce rigorous style checks using `golangci-lint`. Always run `make check` before submitting a PR.
+- **Code style:** We enforce rigorous style checks using `golangci-lint`. Always run `make check` before submitting a PR. Wrap errors with `%w` and test them with `errors.Is`.
 - **Specification vs Implementation:** The format specification in `spec/v1` is versioned independently of the server and has its own compatibility policy. The server is the reference implementation; the spec is the thing we hope outlives it. A language-agnostic conformance suite lives in `spec/conformance/` so other implementations are possible.
 - **Versioning:** Versioning is honest: `v0.x`, and **the object format will break before v1.0.**
 

@@ -114,3 +114,28 @@ func (s Scope) Validate() error {
 func validContextPinKind(k ContextPinKind) bool {
 	return k == ContextPinKindSpec || k == ContextPinKindADR || k == ContextPinKindIssue || k == ContextPinKindDesign || k == ContextPinKindConvention
 }
+
+// IntentState is the mutable lifecycle state of an Intent. The Intent itself is
+// immutable (FR-3.2); its status and supersession live in this separate record,
+// signed by the principal who made the change (SRS §4.4).
+type IntentState struct {
+	Intent       string       `json:"intent"`
+	Status       IntentStatus `json:"status"`
+	SupersededBy string       `json:"superseded_by,omitempty"`
+	UpdatedBy    string       `json:"updated_by"`
+	UpdatedAt    time.Time    `json:"updated_at"`
+	Signature    string       `json:"signature"`
+}
+
+func (s IntentState) Validate() error {
+	if !validContentID(s.Intent, "int_") || !validPrincipalID(s.UpdatedBy) || s.UpdatedAt.IsZero() || strings.TrimSpace(s.Signature) == "" {
+		return ErrInvalidIntent
+	}
+	if s.Status != IntentStatusOpen && s.Status != IntentStatusAttempting && s.Status != IntentStatusMerged && s.Status != IntentStatusAbandoned && s.Status != IntentStatusStale {
+		return ErrInvalidIntent
+	}
+	if s.SupersededBy != "" && (!validContentID(s.SupersededBy, "int_") || s.SupersededBy == s.Intent) {
+		return ErrInvalidIntent
+	}
+	return nil
+}

@@ -4,7 +4,9 @@ An **Intent** is the primary unit of desired change within Meiosis. Instead of r
 
 ## Purpose & Lifecycle
 - **Immutability:** An Intent is immutable once created and signed. Any modifications to the goal, scope, or criteria are made by creating a new Intent with a `SupersededBy` pointer on the predecessor (FR-3.2).
-- **Status:** The lifecycle is tracked via status transitions: `open` -> `attempting` -> `merged` (or `abandoned` / `stale`).
+- **Status:** The lifecycle is tracked via status transitions: `open` -> `attempting` -> `merged` (or `abandoned` / `stale`). Because the Intent itself never changes, its *current* status and any supersession live in a separate [IntentState](#intentstate) record; the `status` field on the Intent is the status at creation. Opening the first attempt on an `open` intent moves it to `attempting`.
+- **Supersession (FR-3.2):** A superseded intent is left exactly as it was. Its IntentState records `superseded_by`, and it accepts no new attempts. An intent can be superseded once, and not once `merged`.
+- **Derived intents (FR-3.8):** Implementations SHOULD let an agent supply only a task description and derive the intent from it: the title is the task's first line (at most 80 characters), the goal is the full task, there is one acceptance criterion, and the scope is the authority the agent already holds. Deriving the same task again for the same principal, repo and scope reuses the existing open intent.
 
 ## Object Definition
 
@@ -43,7 +45,17 @@ Pins the exact version of documentation/issues the author used to write the code
 - `digest` (String, required): BLAKE3 digest of the content at the time of consumption.
 - `kind` (String, required): Allowed values: `"spec"`, `"adr"`, `"issue"`, `"design"`, `"convention"`.
 
+#### IntentState
+The mutable lifecycle state of one Intent, signed by the principal who made the change. Keyed by `intent`; the latest record is current.
+- `intent` (String, required): the IntentID.
+- `status` (String, required): one of the Intent statuses.
+- `superseded_by` (String, optional): the successor IntentID. Must differ from `intent`.
+- `updated_by` (String, required): PrincipalID that made the change.
+- `updated_at` (Timestamp, required): ISO8601 timestamp.
+- `signature` (Sig, required): Ed25519 signature by `updated_by`.
+
 ## Validation Rules & Relationships
-1. **DAG Cycles:** Intents can form a Directed Acyclic Graph via the `depends_on` array. The system MUST reject any cycles.
+1. **DAG Cycles:** Intents can form a Directed Acyclic Graph via the `depends_on` array (and `parent`). The system MUST reject any cycles. Every referenced intent MUST exist. Since an intent ID is derived from content that includes its references, a cycle cannot arise among already-stored intents; it can arise through supersession, because a successor stands in for its predecessor. A successor therefore MUST NOT depend, directly or transitively, on the intent it supersedes.
 2. **Scope Enforcement:** Depending on `scope.mode`, attempts that modify files outside the `allow` globs must be either hard-rejected at push time, or recorded with a scope violation.
-3. **Context Freshness (FR-3.6):** If a document referenced in `context_pins` changes (its content digest no longer matches `digest`), all attempts and merged intents depending on this Intent transition to `stale`.
+3. **Context Pins (FR-3.5):** `digest` is the lower-case hex BLAKE3-256 digest of the document's bytes exactly as consumed. A pin whose `ref` is a repo-relative path can be re-checked by re-hashing the file: a different digest, or a missing file, means the pin has changed. Refs that are URLs or issue ids cannot be re-checked locally and are reported as unchecked, never as matching.
+4. **Context Freshness (FR-3.6):** If a document referenced in `context_pins` changes (its content digest no longer matches `digest`), all attempts and merged intents depending on this Intent transition to `stale`.

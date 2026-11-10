@@ -1,0 +1,50 @@
+{
+  "cases": [
+    {
+      "name": "rfc8785-3.2.4-example",
+      "input": "{\"numbers\":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\",\"literals\":[null,true,false]}",
+      "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}"
+    },
+    {
+      "name": "keys-sorted-by-utf16-code-units",
+      "input": "{\"€\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"😀\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\"}",
+      "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+    },
+    {
+      "name": "whitespace-removed-and-nested-keys-sorted",
+      "input": "{ \"b\" : [ 1 , 2 ] , \"a\" : { \"z\" : null , \"y\" : true } }",
+      "canonical": "{\"a\":{\"y\":true,\"z\":null},\"b\":[1,2]}"
+    },
+    {
+      "name": "integers-and-negative-zero",
+      "input": "[0,-0,1,-1,100,9007199254740991]",
+      "canonical": "[0,0,1,-1,100,9007199254740991]"
+    },
+    {
+      "name": "exponent-forms",
+      "input": "[1e21,1e22,1e-6,1e-7,123456789012345680000,1.5e300,5e-324,1.7976931348623157e308]",
+      "canonical": "[1e+21,1e+22,0.000001,1e-7,123456789012345680000,1.5e+300,5e-324,1.7976931348623157e+308]"
+    },
+    {
+      "name": "fractions",
+      "input": "[0.1,0.5,4.5,0.002,100.0,1.0e2,9.999999999999997e-7]",
+      "canonical": "[0.1,0.5,4.5,0.002,100,100,9.999999999999997e-7]"
+    },
+    {
+      "name": "string-escapes",
+      "input": "[\"\\u0000\\u0001\\u001f\",\"\\u007f\",\"tab\\there\",\"quote\\\"back\\\\slash\",\"é中文\",\"𝄞\"]",
+      "canonical": "[\"\\u0000\\u0001\\u001f\",\"\",\"tab\\there\",\"quote\\\"back\\\\slash\",\"é中文\",\"𝄞\"]"
+    },
+    {
+      "name": "empty-containers",
+      "input": "{\"a\":{},\"b\":[],\"c\":\"\"}",
+      "canonical": "{\"a\":{},\"b\":[],\"c\":\"\"}"
+    },
+    {
+      "name": "deeply-nested",
+      "input": "{\"a\":{\"b\":{\"c\":{\"d\":[{\"e\":1}]}}}}",
+      "canonical": "{\"a\":{\"b\":{\"c\":{\"d\":[{\"e\":1}]}}}}"
+    }
+  ],
+  "description": "RFC 8785 JSON Canonicalization Scheme. For each case, canonicalising `input` must give exactly `canonical`, byte for byte."
+}

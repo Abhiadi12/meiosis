@@ -137,3 +137,45 @@ func TestWorldHashUsesSpecWorldHash(t *testing.T) {
 		t.Fatal("empty tree produced zero WorldHash")
 	}
 }
+
+func TestHasherMatchesNewForTheSameFiles(t *testing.T) {
+	files := map[string][]byte{"a.go": []byte("A"), "dir/b.go": []byte("B"), "dir/sub/c": nil, "z": []byte("Z")}
+	tree, err := NewMemoryTree(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	world, err := New(context.Background(), tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewHasher()
+	for _, p := range []string{"a.go", "dir/b.go", "dir/sub/c", "z"} {
+		if err := h.Add(p, files[p]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if h.Sum() != world.Hash() {
+		t.Fatalf("Hasher = %s, New = %s", h.Sum(), world.Hash())
+	}
+	if NewHasher().Sum() != EmptyTreeHash() {
+		t.Fatal("the empty Hasher must equal the empty tree's hash")
+	}
+}
+
+func TestHasherRejectsUnorderedAndInvalidPaths(t *testing.T) {
+	h := NewHasher()
+	if err := h.Add("b", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Add("a", nil); !errors.Is(err, ErrUnordered) {
+		t.Fatalf("out-of-order Add = %v, want ErrUnordered", err)
+	}
+	if err := h.Add("b", nil); !errors.Is(err, ErrUnordered) {
+		t.Fatalf("duplicate Add = %v, want ErrUnordered", err)
+	}
+	for _, bad := range []string{"", "/abs", "../x", `back\slash`} {
+		if err := NewHasher().Add(bad, nil); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("Add(%q) = %v, want ErrInvalidPath", bad, err)
+		}
+	}
+}

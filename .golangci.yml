@@ -3,17 +3,27 @@ version: "2"
 linters:
   default: none
   enable:
+    - bodyclose
     - errcheck
+    - errorlint
     - govet
     - ineffassign
     - misspell
     - staticcheck
+    - unconvert
     - unused
+    - usestdlibvars
   settings:
     govet:
       enable-all: true
       disable:
         - fieldalignment
+
+  exclusions:
+    rules:
+      # Test helpers such as rpc() close the body for the caller.
+      - path: _test\.go
+        linters: [bodyclose]
 
 formatters:
   enable:

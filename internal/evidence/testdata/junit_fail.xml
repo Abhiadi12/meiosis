@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="auth" tests="99" failures="0">
+    <testcase classname="auth.Login" name="TestLogin" time="0.4">
+      <failure message="expected 200, got 500">stack trace here</failure>
+    </testcase>
+    <testcase classname="auth.Login" name="TestCrash">
+      <error>panic: nil pointer</error>
+    </testcase>
+    <testcase classname="auth.Login" name="TestSlow"><skipped/></testcase>
+    <testcase classname="auth.Login" name="TestOK"/>
+    <testsuite name="nested">
+      <testcase classname="auth.Nested" name="TestInner"><failure message="inner failed"/></testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

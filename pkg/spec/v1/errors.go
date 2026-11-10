@@ -12,4 +12,6 @@ var (
 	ErrInvalidAttestation     = errors.New("invalid attestation")
 	ErrInvalidVerdict         = errors.New("invalid verdict")
 	ErrInvalidCapabilityToken = errors.New("invalid capability token")
+	ErrInvalidRefUpdate       = errors.New("invalid ref update")
+	ErrInvalidOperation       = errors.New("invalid operation")
 )

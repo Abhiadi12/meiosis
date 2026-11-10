@@ -1,3 +1,6 @@
+// Package conformance runs the language-agnostic fixtures and known-answer
+// vectors in this directory against the Go implementation of spec/v1. Other
+// implementations consume the same JSON files; see README.md.
 package conformance_test
 
 import (
@@ -48,7 +51,7 @@ type fixtureValue struct {
 }
 
 func objectTypes() []string {
-	return []string{"principal", "intent", "attempt", "world-hash", "evidence", "attestation", "verdict"}
+	return []string{"principal", "intent", "intent-state", "attempt", "world-hash", "evidence", "evidence-kind", "capability-token", "authority-record", "ref-update", "operation", "attestation", "verdict"}
 }
 
 func fixturePaths(t *testing.T, objectType, validity string) []string {
@@ -81,6 +84,10 @@ func decodeFixture(objectType, path string) (fixtureValue, error) {
 		var v specv1.Intent
 		err = json.Unmarshal(data, &v)
 		value.value, value.validate = v, v.Validate
+	case "intent-state":
+		var v specv1.IntentState
+		err = json.Unmarshal(data, &v)
+		value.value, value.validate = v, v.Validate
 	case "attempt":
 		var v specv1.Attempt
 		err = json.Unmarshal(data, &v)
@@ -91,6 +98,26 @@ func decodeFixture(objectType, path string) (fixtureValue, error) {
 		value.value, value.validate = v, v.Validate
 	case "evidence":
 		var v specv1.Evidence
+		err = json.Unmarshal(data, &v)
+		value.value, value.validate = v, v.Validate
+	case "evidence-kind":
+		var v specv1.EvidenceKindDef
+		err = json.Unmarshal(data, &v)
+		value.value, value.validate = v, v.Validate
+	case "operation":
+		var v specv1.Operation
+		err = json.Unmarshal(data, &v)
+		value.value, value.validate = v, v.Validate
+	case "ref-update":
+		var v specv1.RefUpdate
+		err = json.Unmarshal(data, &v)
+		value.value, value.validate = v, v.Validate
+	case "capability-token":
+		var v specv1.CapabilityToken
+		err = json.Unmarshal(data, &v)
+		value.value, value.validate = v, v.Validate
+	case "authority-record":
+		var v specv1.AuthorityRecord
 		err = json.Unmarshal(data, &v)
 		value.value, value.validate = v, v.Validate
 	case "attestation":

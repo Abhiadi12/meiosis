@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "test-run payload",
+  "description": "Result of a test run. Every property is optional; those present must have the stated type.",
+  "type": "object",
+  "properties": {
+    "format": {"type": "string", "description": "report format the payload was derived from, e.g. junit or go test -json"},
+    "tests": {"type": "integer", "minimum": 0},
+    "failures": {"type": "integer", "minimum": 0},
+    "errors": {"type": "integer", "minimum": 0},
+    "skipped": {"type": "integer", "minimum": 0},
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "suites": {"type": "array", "items": {"type": "object"}},
+    "failed_tests": {"type": "array", "items": {"type": "object", "properties": {"suite": {"type": "string"}, "name": {"type": "string"}, "message": {"type": "string"}}}}
+  }
+}

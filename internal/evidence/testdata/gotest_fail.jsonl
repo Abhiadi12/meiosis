@@ -1,0 +1,5 @@
+{"Time":"2026-09-09T10:00:00Z","Action":"run","Package":"ex/auth","Test":"TestA"}
+{"Time":"2026-09-09T10:00:00Z","Action":"output","Package":"ex/auth","Test":"TestA","Output":"--- FAIL: TestA\n"}
+{"Time":"2026-09-09T10:00:00Z","Action":"output","Package":"ex/auth","Test":"TestA","Output":"    a_test.go:9: boom\n"}
+{"Time":"2026-09-09T10:00:00Z","Action":"fail","Package":"ex/auth","Test":"TestA","Elapsed":0}
+{"Time":"2026-09-09T10:00:00Z","Action":"fail","Package":"ex/auth","Elapsed":0.2}

@@ -31,7 +31,7 @@ func Verify(value any, signature string, publicKey ed25519.PublicKey) (bool, err
 	}
 	signatureBytes, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
-		return false, fmt.Errorf("%w: decode signature: %v", ErrInvalidSignature, err)
+		return false, fmt.Errorf("%w: decode signature: %w", ErrInvalidSignature, err)
 	}
 	if len(signatureBytes) != ed25519.SignatureSize {
 		return false, fmt.Errorf("%w: signature must be %d bytes", ErrInvalidSignature, ed25519.SignatureSize)
@@ -46,14 +46,14 @@ func Verify(value any, signature string, publicKey ed25519.PublicKey) (bool, err
 func unsignedCanonicalBytes(value any) ([]byte, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", specv1.ErrUnsupportedCanonicalValue, err)
+		return nil, fmt.Errorf("%w: %w", specv1.ErrUnsupportedCanonicalValue, err)
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err == nil && fields != nil {
 		delete(fields, "signature")
 		data, err = json.Marshal(fields)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", specv1.ErrUnsupportedCanonicalValue, err)
+			return nil, fmt.Errorf("%w: %w", specv1.ErrUnsupportedCanonicalValue, err)
 		}
 	}
 	return specv1.CanonicalizeJSON(data)

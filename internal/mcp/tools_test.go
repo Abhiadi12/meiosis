@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/mindfire-test/meiosis/internal/graph"
 	"github.com/mindfire-test/meiosis/pkg/crypto"
@@ -75,8 +76,56 @@ func TestHandleIntentCheckPathReflectsScope(t *testing.T) {
 	}
 }
 
+const testAttemptID = "att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+// putAttempt persists an open attempt by author on s's graph.
+func putAttempt(t *testing.T, s *Server, author string) specv1.Attempt {
+	t.Helper()
+	world := specv1.MustParseWorldHash("0000000000000000000000000000000000000000000000000000000000000001")
+	attempt := specv1.Attempt{
+		ID: testAttemptID, Intent: "int_" + "cccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		Author: author, World: world, BaseWorld: world,
+		Status: specv1.AttemptStatusOpen, CreatedAt: time.Unix(1, 0).UTC(), Signature: "sig",
+	}
+	if err := s.Graph.PutAttempt(context.Background(), attempt); err != nil {
+		t.Fatalf("PutAttempt() error = %v", err)
+	}
+	return attempt
+}
+
+func TestHandleEvidenceSubmitRejectsUnknownAttempt(t *testing.T) {
+	s := newTestServer(t)
+	args := `{"attempt":"` + testAttemptID + `","world":"0000000000000000000000000000000000000000000000000000000000000001","kind":"test-run","outcome":"pass","payload":{"passed":1}}`
+	if _, err := handleEvidenceSubmit(context.Background(), s, json.RawMessage(args)); err == nil {
+		t.Fatal("handleEvidenceSubmit() accepted evidence for an attempt that does not exist")
+	}
+}
+
+func TestHandleEvidenceSubmitRejectsSpoofedProducer(t *testing.T) {
+	s := newTestServer(t)
+	putAttempt(t, s, "agent:impl-3")
+	args := `{"attempt":"` + testAttemptID + `","producer":"human:reviewer","world":"0000000000000000000000000000000000000000000000000000000000000001","kind":"test-run","outcome":"pass","payload":{"passed":1}}`
+	if _, err := handleEvidenceSubmit(context.Background(), s, json.RawMessage(args)); err == nil {
+		t.Fatal("handleEvidenceSubmit() accepted a producer other than the authenticated principal")
+	}
+}
+
+func TestHandleEvidenceSubmitMarksSelfProducedEvidenceNotIndependent(t *testing.T) {
+	s := newTestServer(t)
+	putAttempt(t, s, "agent:impl-3") // the daemon's own principal authored the attempt
+	args := `{"attempt":"` + testAttemptID + `","world":"0000000000000000000000000000000000000000000000000000000000000001","kind":"test-run","outcome":"pass","payload":{"passed":1}}`
+	result, err := handleEvidenceSubmit(context.Background(), s, json.RawMessage(args))
+	if err != nil {
+		t.Fatalf("handleEvidenceSubmit() error = %v", err)
+	}
+	if result.(specv1.Evidence).Independent {
+		t.Fatal("evidence the author submitted about its own attempt must not be independent")
+	}
+}
+
 func TestHandleEvidenceSubmitDefaultsProducerToServerPrincipal(t *testing.T) {
 	s := newTestServer(t)
+	putAttempt(t, s, "agent:someone-else")
 	args := `{"attempt":"att_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		"world":"0000000000000000000000000000000000000000000000000000000000000001",
 		"kind":"test-run","outcome":"pass","payload":{"passed":1}}`
@@ -111,8 +160,8 @@ func TestToolsListIncludesValidInputSchemas(t *testing.T) {
 	s := newTestServer(t)
 	listed := s.handleToolsList().(map[string]any)
 	tools := listed["tools"].([]map[string]any)
-	if len(tools) != 3 {
-		t.Fatalf("tools/list returned %d tools, want 3", len(tools))
+	if len(tools) != 18 {
+		t.Fatalf("tools/list returned %d tools, want 18", len(tools))
 	}
 	for _, tool := range tools {
 		name := tool["name"]

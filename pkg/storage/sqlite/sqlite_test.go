@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/mindfire-test/meiosis/pkg/storage"
@@ -159,5 +161,43 @@ func TestTransactionRollsBackAllChanges(t *testing.T) {
 	}
 	if _, err := store.GetBlob(ctx, storage.BlobID("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")); !errors.Is(err, storage.ErrNotFound) {
 		t.Fatalf("rolled-back blob lookup = %v, want ErrNotFound", err)
+	}
+}
+
+func TestOpenHandlesAwkwardPathsAndConcurrentWriters(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "odd name #1 ?x%.db")
+	first, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open(%q) error = %v", path, err)
+	}
+	defer func() { _ = first.Close() }()
+	second, err := Open(path) // a second process (the CLI, a git hook) opening the same file
+	if err != nil {
+		t.Fatalf("second Open() error = %v", err)
+	}
+	defer func() { _ = second.Close() }()
+
+	ctx := context.Background()
+	done := make(chan error, 2)
+	for i, s := range []*Store{first, second} {
+		go func() {
+			for n := 0; n < 50; n++ {
+				if putErr := s.Put(ctx, storage.KindIntent, fmt.Sprintf("k-%d-%d", i, n), []byte("v")); putErr != nil {
+					done <- putErr
+					return
+				}
+			}
+			done <- nil
+		}()
+	}
+	for range 2 {
+		if werr := <-done; werr != nil {
+			t.Fatalf("concurrent write failed (the busy timeout should make writers wait): %v", werr)
+		}
+	}
+	records, err := first.List(ctx, storage.KindIntent)
+	if err != nil || len(records) != 100 {
+		t.Fatalf("List() = %d records, %v; want 100", len(records), err)
 	}
 }

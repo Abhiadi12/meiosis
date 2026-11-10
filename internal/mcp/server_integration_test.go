@@ -48,7 +48,8 @@ func newRPCClient(t *testing.T) *rpcClient {
 	t.Cleanup(func() {
 		_ = clientToServerW.Close()
 		select {
-		case <-done:
+		case serveErr := <-done:
+			_ = serveErr // the connection was closed on purpose; its error is not a failure
 		case <-time.After(time.Second):
 		}
 	})
@@ -91,8 +92,8 @@ func TestServerServesAgentSessionOverStdio(t *testing.T) {
 	listResp := client.call(t, 2, "tools/list", "")
 	listResult := listResp["result"].(map[string]any)
 	tools, _ := listResult["tools"].([]any)
-	if len(tools) != 3 {
-		t.Fatalf("tools/list returned %d tools, want 3", len(tools))
+	if len(tools) != 18 {
+		t.Fatalf("tools/list returned %d tools, want 18", len(tools))
 	}
 
 	createResp := client.call(t, 3, "tools/call", `{"name":"intent_create","arguments":{"repo":"github.com/example/repo","title":"Add feature","goal":"Implement it","acceptance":[{"text":"tests pass"}],"scope":{"allow":["internal/auth/**"],"mode":"enforce"}}}`)

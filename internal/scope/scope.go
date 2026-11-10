@@ -8,52 +8,53 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
-// IsPathAllowed evaluates whether path is permitted by the Intent.
-// A path is allowed if it matches at least one Allow rule and does not match any Deny rule.
-// If Allow is empty, every path is denied by default.
-func (i *Intent) IsPathAllowed(filePath string) (bool, error) {
+// Decision is the outcome of evaluating one path against a scope, with the
+// rule that produced it so a rejection can be explained to a human or agent.
+type Decision struct {
+	Allowed bool
+	// Reason is a legible explanation, e.g. `matches deny rule "src/secret/**"`
+	// or `matches no allow rule (allow: src/**)`.
+	Reason string
+}
+
+// Evaluate decides whether filePath is permitted. A path is allowed if it
+// matches at least one Allow rule and no Deny rule; Deny takes precedence and
+// an empty Allow list denies everything. An unsafe path (absolute, "..",
+// backslashes, non-canonical) is an error rather than a quiet denial.
+func (i *Intent) Evaluate(filePath string) (Decision, error) {
 	if err := validatePath(filePath); err != nil {
-		return false, err
+		return Decision{}, err
 	}
 
-	// Deny rules take precedence. If a path matches any deny rule, block it immediately.
 	for _, denyPattern := range i.Deny {
 		match, err := doublestar.Match(denyPattern, filePath)
 		if err != nil {
-			return false, fmt.Errorf("invalid deny pattern '%s': %w", denyPattern, err)
+			return Decision{}, fmt.Errorf("invalid deny pattern '%s': %w", denyPattern, err)
 		}
 		if match {
-			return false, nil
+			return Decision{Reason: fmt.Sprintf("matches deny rule %q", denyPattern)}, nil
 		}
 	}
 
-	// In strict security contexts, default is deny. If no Allow rules exist, return false.
 	if len(i.Allow) == 0 {
-		return false, nil
+		return Decision{Reason: "the scope allows no paths"}, nil
 	}
-
-	// The path must match at least one Allow rule to be permitted.
 	for _, allowPattern := range i.Allow {
 		match, err := doublestar.Match(allowPattern, filePath)
 		if err != nil {
-			return false, fmt.Errorf("invalid allow pattern '%s': %w", allowPattern, err)
+			return Decision{}, fmt.Errorf("invalid allow pattern '%s': %w", allowPattern, err)
 		}
 		if match {
-			return true, nil
+			return Decision{Allowed: true, Reason: fmt.Sprintf("matches allow rule %q", allowPattern)}, nil
 		}
 	}
-
-	return false, nil
+	return Decision{Reason: fmt.Sprintf("matches no allow rule (allow: %s)", strings.Join(i.Allow, ", "))}, nil
 }
 
-// IsPathAllowed evaluates filePath using intent's allow and deny rules.
-func IsPathAllowed(intent Intent, filePath string) (bool, error) {
-	return intent.IsPathAllowed(filePath)
-}
-
-// IsAllowed is retained as a compatibility alias for IsPathAllowed.
-func (i *Intent) IsAllowed(filePath string) (bool, error) {
-	return i.IsPathAllowed(filePath)
+// IsPathAllowed reports whether path is permitted; see Evaluate.
+func (i *Intent) IsPathAllowed(filePath string) (bool, error) {
+	d, err := i.Evaluate(filePath)
+	return d.Allowed, err
 }
 
 func validatePath(filePath string) error {
