@@ -9,13 +9,18 @@ and the code cannot drift apart without a test failing.
 ```
 cmd/
   mei/               the CLI entry point (stamps the version, calls internal/cli)
-  meiosisd/          the MCP daemon entry point
+  meiosisd/          the MCP daemon entry point (stamps the version, calls internal/daemon)
 internal/            implementation; not importable from outside the module
-  cli/               cobra commands; the only place that prints to a terminal
+  daemon/            the meiosisd implementation: MCP over stdio and a Unix socket
+  repoconfig/        per-repository settings (.meiosis/config.yaml) and the enforcement policy
+  cli/               cobra commands, one file per command group; the only place that
+                     prints to a terminal
                      (templates/ holds the files `mei init` writes)
   server/            HTTP server: Git smart-HTTP, /mcp, /api/v1, /metrics, auth
-  mcp/               tool schemas, handlers, JSON-RPC, REST adapter, idempotency
+  mcp/               tools (one tools_<area>.go per area: schema + handler),
+                     JSON-RPC, REST adapter, idempotency
   pushhook/          the git receive hooks (`mei hook ...`), run as separate processes
+                     (hook.go: env and auth; prereceive.go: decide; postreceive.go: record)
   graph/             the domain core: intents, attempts, workspaces, evidence,
                      authority, ref updates; signs and stores everything
   identity/          capability tokens, delegation, revocation
@@ -38,7 +43,9 @@ spec/
   v1/                the format specification (prose and JSON Schemas)
   conformance/       language-agnostic fixtures and known-answer vectors
 docs/                operations, API, threat model, status, plans
-scripts/             installers, release build, git hooks
+scripts/             installers, release build, hook installer
+tools/commitlint/    Conventional Commits checker (Go; replaces npm commitlint)
+lefthook.yml         git hooks (replaces husky)
 ```
 
 `pkg/` is for code another program could reasonably import and that we promise
@@ -61,9 +68,10 @@ cmd ──► cli ──► server ──► mcp ──► graph ──► ident
   transport or the CLI, and does no networking.
 - **Transports** (`mcp`, `server`, `pushhook`) sit above the core and may not
   import each other upward, nor `cli`.
-- **`cmd/*` is thin**: parse, wire, exit. Logic lives where it can be tested.
+- **`cmd/*` is thin**: stamp the version, call one `internal` package (`cli` or
+  `daemon`), exit. The rule is enforced for both entry points. Logic lives where it can be tested.
 - **Storage** is reached through `pkg/storage`. Only the composition roots
-  (`cmd/meiosisd`, `internal/cli`, `internal/server`, `internal/pushhook`) name the
+  (`internal/daemon`, `internal/cli`, `internal/server`, `internal/pushhook`) name the
   SQLite backend, so adding another is a change in those places.
 
 The exact table is in `internal/architecture/architecture_test.go`. To add a

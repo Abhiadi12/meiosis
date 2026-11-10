@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zeebo/blake3"
@@ -51,17 +52,19 @@ func (e *ScopeError) Is(target error) bool { return target == ErrScopeViolation 
 // EmptyWorld is the hash of the empty tree: the base world of an attempt that
 // starts from nothing. Until git serving supplies real base worlds (M1
 // Phase 6), an attempt's workspace is an overlay on this base.
-func EmptyWorld() specv1.WorldHash {
+func EmptyWorld() specv1.WorldHash { return emptyWorld() }
+
+var emptyWorld = sync.OnceValue(func() specv1.WorldHash {
 	tree, err := worlds.NewMemoryTree(nil)
 	if err != nil {
 		panic(err) // an empty tree is always valid
 	}
 	world, err := worlds.New(context.Background(), tree)
 	if err != nil {
-		panic(err)
+		panic(err) // hashing an empty tree cannot fail
 	}
 	return world.Hash()
-}
+})
 
 // OpenAttemptParams describes the attempt being opened.
 type OpenAttemptParams struct {

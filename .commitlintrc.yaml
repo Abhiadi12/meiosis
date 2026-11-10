@@ -1,3 +1,6 @@
+# The commit rules, written down. They are enforced by tools/commitlint (Go,
+# no npm); this file stays so editors and bots that read the npm commitlint
+# format see the same policy.
 extends:
   - "@commitlint/config-conventional"
 rules:

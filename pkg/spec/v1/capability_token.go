@@ -10,8 +10,8 @@ import (
 // MaxDelegationDepth bounds how many delegations may stack on a root token.
 const MaxDelegationDepth = 8
 
-// CapabilityOperationAll, as the only entry of Operations, permits every
-// operation. An empty Operations list means the same.
+// CapabilityOperationAll is the wildcard operation: as the only entry of
+// Operations it permits every operation, as does an empty list.
 const CapabilityOperationAll = "*"
 
 // CapabilityOperations are the operations a token's Operations list may name.
@@ -80,6 +80,7 @@ type CapabilityToken struct {
 	Signature string `json:"signature"`
 }
 
+// Validate reports whether the token is well formed; it checks shape, not signatures or expiry (see internal/identity.Verify).
 func (t CapabilityToken) Validate() error {
 	return t.validate(0)
 }
@@ -162,6 +163,7 @@ type AuthorityRecord struct {
 	Signature string          `json:"signature"`
 }
 
+// Validate reports whether the record is well formed; it checks shape, not signatures.
 func (r AuthorityRecord) Validate() error {
 	if !validContentID(r.ID, "aut_") || !IsCapabilityOperation(r.Op) || !validPrincipalID(r.Principal) || r.At.IsZero() || strings.TrimSpace(r.Signature) == "" {
 		return ErrInvalidCapabilityToken

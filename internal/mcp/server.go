@@ -301,11 +301,11 @@ func (s *Server) checkOperation(tool string, args json.RawMessage) error {
 		CapabilityToken json.RawMessage `json:"capability_token"`
 	}
 	if json.Unmarshal(args, &envelope) != nil || len(envelope.CapabilityToken) == 0 {
-		return nil
+		return nil //nolint:nilerr // authentication is enforced elsewhere; this only pre-checks the operation
 	}
 	token, err := decodeToken(envelope.CapabilityToken)
 	if err != nil || identity.Verify(token, s.IssuerKey, s.Revocation, time.Now()) != nil {
-		return nil
+		return nil //nolint:nilerr // authentication is enforced elsewhere; this only pre-checks the operation
 	}
 	if err := identity.CheckOperation(token, tool); err != nil {
 		return &rpcError{code: ErrCodeInvalidParams, message: err.Error(), cause: err}

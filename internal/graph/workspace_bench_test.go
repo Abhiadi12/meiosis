@@ -37,13 +37,13 @@ func BenchmarkForkAttempt(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			for i := 0; i < files; i++ {
+			for i := range files {
 				if _, err = store.WriteFile(ctx, graph.WriteParams{Attempt: source.ID, Author: "agent:b", Path: fmt.Sprintf("d%d/f%d", i%20, i), Content: []byte("x")}, keys.PrivateKey); err != nil {
 					b.Fatal(err)
 				}
 			}
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				if _, err = store.ForkAttempt(ctx, graph.ForkParams{Source: source.ID, Author: "agent:b"}, keys.PrivateKey); err != nil {
 					b.Fatal(err)
 				}

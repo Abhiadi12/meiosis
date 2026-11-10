@@ -9,6 +9,7 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -248,7 +249,7 @@ func ParseBearer(s string) (specv1.CapabilityToken, error) {
 			return Decode(data)
 		}
 	}
-	return specv1.CapabilityToken{}, fmt.Errorf("identity: bearer token is not base64")
+	return specv1.CapabilityToken{}, errors.New("identity: bearer token is not base64")
 }
 
 // TokenScopeAllows reports whether token's own scope permits path. It does not

@@ -6,9 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"path"
 	"sort"
-	"strings"
 
 	specv1 "github.com/mindfire-test/meiosis/pkg/spec/v1"
 	"github.com/zeebo/blake3"
@@ -208,11 +206,7 @@ func (h *Hasher) Sum() specv1.WorldHash {
 }
 
 func validatePath(filePath string) error {
-	if filePath == "" || strings.HasPrefix(filePath, "/") || strings.Contains(filePath, "\\") {
-		return fmt.Errorf("%w: %q", ErrInvalidPath, filePath)
-	}
-	clean := path.Clean(filePath)
-	if clean != filePath || clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
+	if !specv1.ValidRepoPath(filePath) {
 		return fmt.Errorf("%w: %q", ErrInvalidPath, filePath)
 	}
 	return nil

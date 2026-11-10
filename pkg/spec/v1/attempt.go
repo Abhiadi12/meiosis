@@ -5,19 +5,23 @@ import (
 	"time"
 )
 
+// AttemptStatus is the lifecycle state of an Attempt.
 type AttemptStatus string
 
+// The statuses an Attempt can have.
 const (
 	AttemptStatusOpen      AttemptStatus = "open"
 	AttemptStatusMerged    AttemptStatus = "merged"
 	AttemptStatusAbandoned AttemptStatus = "abandoned"
 )
 
+// ScopeViolation records one path an attempt changed outside its intent's scope (warn mode).
 type ScopeViolation struct {
 	Path   string `json:"path"`
 	Reason string `json:"reason,omitempty"`
 }
 
+// Attempt is one principal's implementation of an Intent, identified by the world it produced. See spec/v1/attempt.md.
 type Attempt struct {
 	ID        string    `json:"id"`
 	Intent    string    `json:"intent"`
@@ -34,6 +38,7 @@ type Attempt struct {
 	Signature       string           `json:"signature"`
 }
 
+// Validate reports whether the attempt is well formed; it checks shape, not signatures.
 func (a Attempt) Validate() error {
 	if !validContentID(a.ID, "att_") || !validContentID(a.Intent, "int_") || !validPrincipalID(a.Author) || a.World.Validate() != nil || a.BaseWorld.Validate() != nil || a.CreatedAt.IsZero() || strings.TrimSpace(a.Signature) == "" {
 		return ErrInvalidAttempt

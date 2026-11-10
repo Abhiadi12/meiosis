@@ -6,8 +6,10 @@ import (
 	"time"
 )
 
+// EvidenceKind names the type of an Evidence record and selects its payload schema.
 type EvidenceKind string
 
+// The built-in evidence kinds. Custom kinds are prefixed "x-".
 const (
 	EvidenceKindTestRun        EvidenceKind = "test-run"
 	EvidenceKindCoverage       EvidenceKind = "coverage"
@@ -20,14 +22,17 @@ const (
 	EvidenceKindHumanReview    EvidenceKind = "human-review"
 )
 
+// EvidenceOutcome is the result an Evidence record reports.
 type EvidenceOutcome string
 
+// The outcomes an Evidence record can report.
 const (
 	EvidenceOutcomePass         EvidenceOutcome = "pass"
 	EvidenceOutcomeFail         EvidenceOutcome = "fail"
 	EvidenceOutcomeInconclusive EvidenceOutcome = "inconclusive"
 )
 
+// Evidence is a signed claim about one world, produced by one principal. See spec/v1/evidence.md.
 type Evidence struct {
 	ID       string       `json:"id"`
 	Attempt  string       `json:"attempt"`
@@ -50,6 +55,7 @@ type Evidence struct {
 	Signature  string          `json:"signature"`
 }
 
+// Validate reports whether the evidence is well formed; it checks shape, not signatures or the payload schema.
 func (e Evidence) Validate() error {
 	if strings.TrimSpace(e.ID) == "" || !validContentID(e.Attempt, "att_") || e.World.Validate() != nil || !validPrincipalID(e.Producer) || !validEvidenceKind(e.Kind) || !validEvidenceOutcome(e.Outcome) || len(e.Payload) == 0 || !json.Valid(e.Payload) || e.CreatedAt.IsZero() || strings.TrimSpace(e.Signature) == "" {
 		return ErrInvalidEvidence
@@ -109,6 +115,7 @@ type EvidenceKindDef struct {
 	Signature    string          `json:"signature"`
 }
 
+// Validate reports whether the kind definition is well formed.
 func (d EvidenceKindDef) Validate() error {
 	if !IsCustomEvidenceKind(d.Kind) || !validPrincipalID(d.RegisteredBy) || d.RegisteredAt.IsZero() || strings.TrimSpace(d.Signature) == "" {
 		return ErrInvalidEvidence

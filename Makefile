@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help all build test test-short acceptance cover fuzz bench lint fmt fmt-check vet tidy tidy-check vectors cross check vuln clean
+.PHONY: hooks commitlint help all build test test-short acceptance cover fuzz bench lint fmt fmt-check vet tidy tidy-check vectors cross check vuln clean
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -38,11 +38,11 @@ bench: ## Benchmarks (workspace fork, and so on)
 lint: ## golangci-lint
 	golangci-lint run
 
-fmt: ## Format the code
-	gofmt -w .
+fmt: ## Format the code (gofumpt + goimports, as the linter checks)
+	golangci-lint fmt
 
 fmt-check: ## Fail if any file is unformatted
-	@test -z "$$(gofmt -l .)" || { echo "unformatted:"; gofmt -l .; exit 1; }
+	golangci-lint fmt --diff
 
 vet: ## go vet
 	go vet ./...
@@ -67,7 +67,13 @@ cross: ## Build every release target
 vuln: ## Scan dependencies for known vulnerabilities
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-check: fmt-check vet lint tidy-check test ## What a pull request must pass
+hooks: ## Install git hooks (lefthook: format, vet, commit message, lint on push)
+	./scripts/install-hooks.sh
+
+commitlint: ## Check the commits on this branch against Conventional Commits
+	go run ./tools/commitlint --from $$(git merge-base HEAD origin/main) --to HEAD
+
+check: fmt-check lint tidy-check test ## What a pull request must pass
 
 clean: ## Remove build output
 	rm -rf bin dist coverage.out coverage.html

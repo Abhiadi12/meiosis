@@ -24,6 +24,7 @@ func NewMemoryTree(files map[string][]byte) (*MemoryTree, error) {
 	return &MemoryTree{files: copyFiles}, nil
 }
 
+// Files returns a copy of the tree's files, keyed by path.
 func (t *MemoryTree) Files(context.Context) (map[string][]byte, error) {
 	if t == nil {
 		return nil, ErrNilTree
@@ -90,6 +91,7 @@ func NewMemorySnapshotter(tree *MemoryTree) (*MemorySnapshotter, error) {
 	return &MemorySnapshotter{tree: tree}, nil
 }
 
+// Snapshot returns the files of the tree it was created from.
 func (s *MemorySnapshotter) Snapshot(ctx context.Context) (Tree, error) {
 	if s == nil || s.tree == nil {
 		return nil, ErrNilTree
@@ -119,5 +121,7 @@ func (t *MemoryTree) String() string {
 	return fmt.Sprintf("MemoryTree(%d files)", len(t.files))
 }
 
-var _ ForkableTree = (*MemoryTree)(nil)
-var _ Snapshotter = (*MemorySnapshotter)(nil)
+var (
+	_ ForkableTree = (*MemoryTree)(nil)
+	_ Snapshotter  = (*MemorySnapshotter)(nil)
+)

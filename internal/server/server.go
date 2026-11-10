@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -237,11 +238,31 @@ func (s *Server) instrument(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
+		s.serveRecovering(rec, r, next)
 		route := routeOf(r.URL.Path)
 		s.requests.Inc(route, strconv.Itoa(rec.status))
 		s.latency.Observe(time.Since(started).Seconds(), route)
 	})
+}
+
+// serveRecovering runs next and turns a panic in a handler into a logged 500,
+// so one bad request cannot take the server down or leave the client hanging.
+// http.ErrAbortHandler is passed through: it is how a handler aborts on purpose.
+func (s *Server) serveRecovering(rec *statusRecorder, r *http.Request, next http.Handler) {
+	defer func() {
+		v := recover()
+		if v == nil {
+			return
+		}
+		if v == http.ErrAbortHandler { //nolint:errorlint // net/http documents comparing the recovered value directly
+			panic(v)
+		}
+		s.log.Error("handler panic", "method", r.Method, "path", r.URL.Path, "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
+		if !rec.wrote {
+			http.Error(rec, "internal server error", http.StatusInternalServerError)
+		}
+	}()
+	next.ServeHTTP(rec, r)
 }
 
 func routeOf(p string) string {
@@ -290,7 +311,8 @@ func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter 
 
 // Serve listens on cfg.Addr until ctx is done, then shuts down cleanly.
 func (s *Server) Serve(ctx context.Context) error {
-	ln, err := net.Listen("tcp", s.cfg.Addr)
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", s.cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.cfg.Addr, err)
 	}
@@ -299,7 +321,15 @@ func (s *Server) Serve(ctx context.Context) error {
 
 // ServeListener is Serve on an existing listener.
 func (s *Server) ServeListener(ctx context.Context, ln net.Listener) error {
-	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 15 * time.Second}
+	// No read or write timeout: a git push or clone legitimately streams for a
+	// long time. Slow clients are bounded by the header and idle timeouts.
+	srv := &http.Server{
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    1 << 20,
+		ErrorLog:          slog.NewLogLogger(s.log.Handler(), slog.LevelWarn),
+	}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
 	select {
@@ -390,7 +420,7 @@ func (s *Server) serveGit(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := os.Stat(filepath.Join(s.cfg.ReposDir, name+".git")); err != nil {
+	if _, err := os.Stat(filepath.Join(s.cfg.ReposDir, name+".git")); err != nil { //nolint:gosec // name was validated by repoOf against repoNamePattern
 		http.NotFound(w, r)
 		return
 	}

@@ -36,7 +36,7 @@ func New(config *viper.Viper) *cobra.Command {
 		Short:         "Meiosis developer CLI",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			if err := readConfig(config); err != nil {
 				return err
 			}

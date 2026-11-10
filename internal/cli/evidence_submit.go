@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -55,13 +56,13 @@ inconclusive, so a pass is never implied without a stated bar.`,
 			raw := payload != ""
 			switch {
 			case raw && (from != "" || format != ""):
-				return fmt.Errorf("--payload cannot be combined with --from or --report-format")
+				return errors.New("--payload cannot be combined with --from or --report-format")
 			case raw && (kind == "" || outcome == ""):
-				return fmt.Errorf("--payload needs --kind and --outcome: nothing reads the payload to work them out")
+				return errors.New("--payload needs --kind and --outcome: nothing reads the payload to work them out")
 			case !raw && from == "":
-				return fmt.Errorf("--from is required: a report file, or - for standard input (or --payload to supply the result yourself)")
+				return errors.New("--from is required: a report file, or - for standard input (or --payload to supply the result yourself)")
 			case !raw && outcome != "":
-				return fmt.Errorf("--outcome is only for --payload; a report's outcome comes from the report")
+				return errors.New("--outcome is only for --payload; a report's outcome comes from the report")
 			}
 			source := from
 			if raw {
@@ -182,7 +183,7 @@ func pickAttempt(attempts []specv1.Attempt, ref string) (specv1.Attempt, error) 
 	}
 	switch len(open) {
 	case 0:
-		return specv1.Attempt{}, fmt.Errorf("there is no open attempt to attach evidence to")
+		return specv1.Attempt{}, errors.New("there is no open attempt to attach evidence to")
 	case 1:
 		return open[0], nil
 	}
@@ -226,7 +227,7 @@ func renderSubmitted(cmd *cobra.Command, settings *Settings, record specv1.Evide
 		extra = ", supersedes " + shortID(record.Supersedes)
 	}
 	_, err := fmt.Fprintf(cmd.OutOrStdout(), "evidence %s recorded: %s %s (from %s) by %s, %s%s\n  bound to world %s\n",
-		record.ID, record.Kind, record.Outcome, parsed.Format, record.Producer, independence, extra, shortWorld(record.World))
+		record.ID, record.Kind, record.Outcome, parsed.Format, record.Producer, independence, extra, record.World.Short())
 	return err
 }
 
@@ -250,7 +251,7 @@ name such as x-NAME-v2.`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if schemaPath == "" {
-				return fmt.Errorf("--schema is required")
+				return errors.New("--schema is required")
 			}
 			schema, err := os.ReadFile(schemaPath)
 			if err != nil {

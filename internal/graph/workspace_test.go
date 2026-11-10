@@ -69,7 +69,7 @@ func TestEveryWorkspaceActionIsASignedOperationInAnAppendOnlyLog(t *testing.T) {
 	if got := strings.Join(kinds, ","); got != "commit,delete,write,open" {
 		t.Fatalf("log (newest first) = %s, want commit,delete,write,open", got)
 	}
-	for i := 0; i < len(ops)-1; i++ {
+	for i := range len(ops) - 1 {
 		if ops[i].Parent != ops[i+1].ID || ops[i].Seq != ops[i+1].Seq+1 {
 			t.Errorf("operations are not a chain at %d: %+v", i, ops[i])
 		}
@@ -83,7 +83,7 @@ func TestLongHistoriesReadThroughSnapshotsAndStillResolveCorrectly(t *testing.T)
 	env := newAttemptEnv(t)
 	attempt := openedAttempt(t, env)
 	want := map[string]string{}
-	for i := 0; i < 3*specv1.SnapshotInterval+5; i++ {
+	for i := range 3*specv1.SnapshotInterval + 5 {
 		path := fmt.Sprintf("src/f%d.go", i%40) // overwrites, so history matters
 		content := fmt.Sprintf("version %d", i)
 		if _, err := env.write(attempt, path, content); err != nil {
@@ -188,7 +188,7 @@ func TestForkCostIsIndependentOfWorkspaceSize(t *testing.T) {
 	env := newAttemptEnv(t)
 	intent := env.intent(t, specv1.ScopeModeEnforce)
 	small, big := env.open(t, intent), env.open(t, intent)
-	for i := 0; i < 600; i++ {
+	for i := range 600 {
 		if _, err := env.write(big, fmt.Sprintf("src/dir%d/file%d.go", i%30, i), "x"); err != nil {
 			t.Fatal(err)
 		}

@@ -3,6 +3,7 @@ package evidence
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"io"
 
@@ -30,7 +31,7 @@ type IngestParams struct {
 // from the caller.
 func Ingest(ctx context.Context, store *graph.Store, p IngestParams, key ed25519.PrivateKey, report []byte) (specv1.Evidence, Report, error) {
 	if store == nil {
-		return specv1.Evidence{}, Report{}, fmt.Errorf("evidence graph store must not be nil")
+		return specv1.Evidence{}, Report{}, errors.New("evidence graph store must not be nil")
 	}
 	format := p.Format
 	if format == "" {

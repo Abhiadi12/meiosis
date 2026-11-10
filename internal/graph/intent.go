@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 
 // ErrInvalidParams is returned when a built record fails validation before
 // it would otherwise be persisted.
-var ErrInvalidParams = fmt.Errorf("graph: invalid parameters")
+var ErrInvalidParams = errors.New("graph: invalid parameters")
 
 // NewStore returns a Store persisting through backend. It is equivalent to
 // New, save for the nil check, and exists for callers (the MCP daemon,

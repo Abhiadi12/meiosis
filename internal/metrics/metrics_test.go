@@ -63,15 +63,15 @@ func TestSeriesAreSharedPerLabelValuesAndSafeConcurrently(t *testing.T) {
 	r := NewRegistry()
 	c := r.Counter("c_total", "c", "k")
 	done := make(chan struct{})
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		go func() {
-			for j := 0; j < 500; j++ {
+			for range 500 {
 				c.Inc("a")
 			}
 			done <- struct{}{}
 		}()
 	}
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		<-done
 	}
 	if out := render(t, r); !strings.Contains(out, `c_total{k="a"} 4000`) {

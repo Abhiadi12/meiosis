@@ -71,7 +71,7 @@ func (r Repo) output(ctx context.Context, args ...string) ([]byte, error) {
 // a push can name its intent), and history rewriting and ref deletion refused.
 // Calling it on an existing repository only re-applies the configuration.
 func InitBare(ctx context.Context, git, dir string) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create %s: %w", dir, err)
 	}
 	r := Repo{Dir: dir, Git: git}
@@ -104,12 +104,12 @@ func InitBare(ctx context.Context, git, dir string) error {
 // those names are replaced.
 func InstallHooks(dir, meiBinary string) error {
 	hooks := filepath.Join(dir, "hooks")
-	if err := os.MkdirAll(hooks, 0o755); err != nil {
+	if err := os.MkdirAll(hooks, 0o750); err != nil {
 		return err
 	}
 	for _, name := range []string{"pre-receive", "post-receive"} {
 		script := "#!/bin/sh\n# Installed by meiosis; replaced on every `mei serve`.\nexec " + shellQuote(meiBinary) + " hook " + name + "\n"
-		if err := os.WriteFile(filepath.Join(hooks, name), []byte(script), 0o755); err != nil {
+		if err := os.WriteFile(filepath.Join(hooks, name), []byte(script), 0o755); err != nil { //nolint:gosec // git requires hook scripts to be executable
 			return fmt.Errorf("write %s hook: %w", name, err)
 		}
 	}

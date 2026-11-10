@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -11,18 +12,23 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mindfire-test/meiosis/internal/repoconfig"
 	"github.com/mindfire-test/meiosis/internal/server"
 )
 
+// serveOptions holds the flags of `mei serve`; resolve fills the defaults that
+// depend on the repository.
+type serveOptions struct {
+	addr, reposDir, repoName, dbPath string
+	issuerPath, signerKey, signer    string
+	agentKey, agent, gitBin          string
+	allowUnauth                      bool
+	noInit                           bool
+	secretsMode                      string
+}
+
 func newServeCommand(settings *Settings) *cobra.Command {
-	var (
-		addr, reposDir, repoName, dbPath string
-		issuerPath, signerKey, signer    string
-		agentKey, agent, gitBin          string
-		allowUnauth                      bool
-		noInit                           bool
-		secretsMode                      string
-	)
+	var o serveOptions
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Serve this repository over Git and MCP, with capability-token auth and push policy",
@@ -49,115 +55,152 @@ credentials.`,
 			if err != nil {
 				return err
 			}
-			meiosis := filepath.Join(root, ".meiosis")
-			if dbPath == "" {
-				dbPath = filepath.Join(meiosis, "meiosisd.db")
-			}
-			if reposDir == "" {
-				reposDir = filepath.Join(meiosis, "git")
-			}
-			if repoName == "" {
-				repoName = server.SanitizeRepoName(filepath.Base(root))
-			}
-			if signerKey == "" {
-				signerKey = filepath.Join(meiosis, "human.private.key")
-			}
-			if agentKey == "" {
-				agentKey = filepath.Join(meiosis, "agent.private.key")
-			}
-			if _, statErr := os.Stat(signerKey); statErr != nil {
-				// First run (NFR-5.2): `mei serve` is the only command needed. Set up
-				// the repository the way `mei init` would, without touching any IDE.
-				if noInit {
-					return fmt.Errorf("no signing key at %s: run `mei init` first (--no-init was given)", signerKey)
-				}
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "first run in %s: setting up (as `mei init --ide none` would)\n", root)
-				if initErr := runInit(cmd.ErrOrStderr(), &initOptions{repo: root, ide: "none", ttl: initTokenTTL, strict: true}); initErr != nil {
-					return fmt.Errorf("first-run setup: %w", initErr)
-				}
-			}
-			if signer == "" {
-				name, nameErr := defaultHumanName()
-				if nameErr != nil {
-					return nameErr
-				}
-				signer = "human:" + name
-			}
-			if agent == "" {
-				agent = "agent:meiosis"
-				if t, tErr := loadToken(filepath.Join(root, ".agents", "meiosis-capability.json")); tErr == nil {
-					agent = t.Principal
-				}
-			}
-			if gitBin != "" {
-				if _, lookErr := exec.LookPath(gitBin); lookErr != nil {
-					return fmt.Errorf("git binary %q not found: %w", gitBin, lookErr)
-				}
-			} else if _, lookErr := exec.LookPath("git"); lookErr != nil {
-				return fmt.Errorf("serving repositories needs git on PATH: %w", lookErr)
-			}
-
-			issuer, strict, err := server.ResolveEnforcement(issuerPath, dbPath, allowUnauth, cmd.ErrOrStderr())
-			if err != nil {
-				return err
-			}
-			self, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("find the mei binary the hooks should run: %w", err)
-			}
-			if resolved, evalErr := filepath.EvalSymlinks(self); evalErr == nil {
-				self = resolved
-			}
-
-			if secretsMode == "" {
-				secretsMode = server.RepoSecretsMode(filepath.Dir(dbPath))
-			}
-			srv, err := server.New(server.Config{
-				Addr: addr, ReposDir: reposDir, Repos: []string{repoName}, DB: dbPath, Mei: self, Git: gitBin,
-				SignerKeyPath: signerKey, Signer: signer, IssuerKeyPath: issuer, Strict: strict, Secrets: secretsMode,
-				Agent: agent, AgentKeyPath: agentKey, Version: Version,
-			})
-			if err != nil {
-				return err
-			}
-			defer func() { _ = srv.Close() }()
-
-			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-			defer stop()
-
-			out := cmd.ErrOrStderr()
-			base := "http://" + addr
-			_, _ = fmt.Fprintf(out, "meiosis serving %q on %s\n", repoName, base)
-			_, _ = fmt.Fprintf(out, "  git  : %s/%s.git\n  mcp  : %s/mcp (acts as %s)\n", base, repoName, base, agent)
-			switch {
-			case issuer == "":
-				_, _ = fmt.Fprintln(out, "  auth : NONE (--allow-unauthenticated): anyone who can reach this address can push")
-			case strict:
-				_, _ = fmt.Fprintln(out, "  auth : capability tokens required (strict)")
-			default:
-				_, _ = fmt.Fprintln(out, "  auth : capability tokens required")
-			}
-			if host, _, ok := strings.Cut(addr, ":"); ok && host != "127.0.0.1" && host != "localhost" && host != "[::1]" {
-				_, _ = fmt.Fprintln(out, "  note : this address is not loopback; tokens are bearer credentials, so put TLS in front of it")
-			}
-			_, _ = fmt.Fprintf(out, "  scan : credentials in pushes: %s\n", secretsMode)
-			_, _ = fmt.Fprintf(out, "  next : mei remote add meiosis --url %s/%s.git && git push meiosis main\n", base, repoName)
-			return srv.Serve(ctx)
+			return o.run(cmd, root)
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&addr, "addr", "127.0.0.1:8484", "address to listen on")
-	flags.StringVar(&repoName, "name", "", "repository name (default: this directory's name)")
-	flags.StringVar(&reposDir, "repos-dir", "", "where the bare repositories live (default: <repo>/.meiosis/git)")
-	flags.StringVar(&dbPath, "db", "", "path to the store database (default: <repo>/.meiosis/meiosisd.db)")
-	flags.StringVar(&issuerPath, "issuer-pubkey", "", "trusted issuer public key (default: <repo>/.meiosis/human.public.key)")
-	flags.StringVar(&secretsMode, "secrets", "", "credential scanning of pushes: off, warn or block (default: the repository config, else warn)")
-	flags.BoolVar(&noInit, "no-init", false, "do not set the repository up on first run; fail instead")
-	flags.BoolVar(&allowUnauth, "allow-unauthenticated", false, "serve without capability tokens (refused in a strict repository)")
-	flags.StringVar(&signerKey, "signer-key", "", "key that signs ref update records (default: <repo>/.meiosis/human.private.key)")
-	flags.StringVar(&signer, "signer", "", "principal for --signer-key (default: human:<username>)")
-	flags.StringVar(&agentKey, "agent-key", "", "key the /mcp endpoint signs as (default: <repo>/.meiosis/agent.private.key)")
-	flags.StringVar(&agent, "agent", "", "principal for --agent-key (default: the one in .agents/meiosis-capability.json)")
-	flags.StringVar(&gitBin, "git", "", "git binary (default: git on PATH)")
+	flags.StringVar(&o.addr, "addr", "127.0.0.1:8484", "address to listen on")
+	flags.StringVar(&o.repoName, "name", "", "repository name (default: this directory's name)")
+	flags.StringVar(&o.reposDir, "repos-dir", "", "where the bare repositories live (default: <repo>/.meiosis/git)")
+	flags.StringVar(&o.dbPath, "db", "", "path to the store database (default: <repo>/.meiosis/meiosisd.db)")
+	flags.StringVar(&o.issuerPath, "issuer-pubkey", "", "trusted issuer public key (default: <repo>/.meiosis/human.public.key)")
+	flags.StringVar(&o.secretsMode, "secrets", "", "credential scanning of pushes: off, warn or block (default: the repository config, else warn)")
+	flags.BoolVar(&o.noInit, "no-init", false, "do not set the repository up on first run; fail instead")
+	flags.BoolVar(&o.allowUnauth, "allow-unauthenticated", false, "serve without capability tokens (refused in a strict repository)")
+	flags.StringVar(&o.signerKey, "signer-key", "", "key that signs ref update records (default: <repo>/.meiosis/human.private.key)")
+	flags.StringVar(&o.signer, "signer", "", "principal for --signer-key (default: human:<username>)")
+	flags.StringVar(&o.agentKey, "agent-key", "", "key the /mcp endpoint signs as (default: <repo>/.meiosis/agent.private.key)")
+	flags.StringVar(&o.agent, "agent", "", "principal for --agent-key (default: the one in .agents/meiosis-capability.json)")
+	flags.StringVar(&o.gitBin, "git", "", "git binary (default: git on PATH)")
 	return cmd
+}
+
+// resolve fills in every default that depends on the repository root.
+func (o *serveOptions) resolve(root string) {
+	meiosis := filepath.Join(root, ".meiosis")
+	if o.dbPath == "" {
+		o.dbPath = filepath.Join(meiosis, "meiosisd.db")
+	}
+	if o.reposDir == "" {
+		o.reposDir = filepath.Join(meiosis, "git")
+	}
+	if o.repoName == "" {
+		o.repoName = server.SanitizeRepoName(filepath.Base(root))
+	}
+	if o.signerKey == "" {
+		o.signerKey = filepath.Join(meiosis, "human.private.key")
+	}
+	if o.agentKey == "" {
+		o.agentKey = filepath.Join(meiosis, "agent.private.key")
+	}
+}
+
+// ensureInitialised sets the repository up on first run (NFR-5.2: `mei serve`
+// is the only command needed), the way `mei init --ide none` would.
+func (o *serveOptions) ensureInitialised(cmd *cobra.Command, root string) error {
+	if _, err := os.Stat(o.signerKey); err == nil {
+		return nil
+	}
+	if o.noInit {
+		return fmt.Errorf("no signing key at %s: run `mei init` first (--no-init was given)", o.signerKey)
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "first run in %s: setting up (as `mei init --ide none` would)\n", root)
+	if err := runInit(cmd.ErrOrStderr(), &initOptions{repo: root, ide: "none", ttl: initTokenTTL, strict: true}); err != nil {
+		return fmt.Errorf("first-run setup: %w", err)
+	}
+	return nil
+}
+
+// resolvePrincipals defaults the signer and agent principals.
+func (o *serveOptions) resolvePrincipals(root string) error {
+	if o.signer == "" {
+		name, err := defaultHumanName()
+		if err != nil {
+			return err
+		}
+		o.signer = "human:" + name
+	}
+	if o.agent == "" {
+		o.agent = "agent:meiosis"
+		if t, err := loadToken(filepath.Join(root, ".agents", "meiosis-capability.json")); err == nil {
+			o.agent = t.Principal
+		}
+	}
+	return nil
+}
+
+// checkGit fails early when the git binary the server needs is missing.
+func (o *serveOptions) checkGit() error {
+	bin := o.gitBin
+	if bin == "" {
+		bin = "git"
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		if o.gitBin != "" {
+			return fmt.Errorf("git binary %q not found: %w", o.gitBin, err)
+		}
+		return fmt.Errorf("serving repositories needs git on PATH: %w", err)
+	}
+	return nil
+}
+
+func (o *serveOptions) run(cmd *cobra.Command, root string) error {
+	o.resolve(root)
+	if err := o.ensureInitialised(cmd, root); err != nil {
+		return err
+	}
+	if err := o.resolvePrincipals(root); err != nil {
+		return err
+	}
+	if err := o.checkGit(); err != nil {
+		return err
+	}
+	issuer, strict, err := repoconfig.ResolveEnforcement(o.issuerPath, o.dbPath, o.allowUnauth, cmd.ErrOrStderr())
+	if err != nil {
+		return err
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("find the mei binary the hooks should run: %w", err)
+	}
+	if resolved, evalErr := filepath.EvalSymlinks(self); evalErr == nil {
+		self = resolved
+	}
+	if o.secretsMode == "" {
+		o.secretsMode = repoconfig.SecretsMode(filepath.Dir(o.dbPath))
+	}
+	srv, err := server.New(server.Config{
+		Addr: o.addr, ReposDir: o.reposDir, Repos: []string{o.repoName}, DB: o.dbPath, Mei: self, Git: o.gitBin,
+		SignerKeyPath: o.signerKey, Signer: o.signer, IssuerKeyPath: issuer, Strict: strict, Secrets: o.secretsMode,
+		Agent: o.agent, AgentKeyPath: o.agentKey, Version: Version,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = srv.Close() }()
+
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	o.banner(cmd.ErrOrStderr(), issuer, strict)
+	return srv.Serve(ctx)
+}
+
+// banner tells the user what is being served and how it is protected.
+func (o *serveOptions) banner(out io.Writer, issuer string, strict bool) {
+	base := "http://" + o.addr
+	_, _ = fmt.Fprintf(out, "meiosis serving %q on %s\n", o.repoName, base)
+	_, _ = fmt.Fprintf(out, "  git  : %s/%s.git\n  mcp  : %s/mcp (acts as %s)\n", base, o.repoName, base, o.agent)
+	switch {
+	case issuer == "":
+		_, _ = fmt.Fprintln(out, "  auth : NONE (--allow-unauthenticated): anyone who can reach this address can push")
+	case strict:
+		_, _ = fmt.Fprintln(out, "  auth : capability tokens required (strict)")
+	default:
+		_, _ = fmt.Fprintln(out, "  auth : capability tokens required")
+	}
+	if host, _, ok := strings.Cut(o.addr, ":"); ok && host != "127.0.0.1" && host != "localhost" && host != "[::1]" {
+		_, _ = fmt.Fprintln(out, "  note : this address is not loopback; tokens are bearer credentials, so put TLS in front of it")
+	}
+	_, _ = fmt.Fprintf(out, "  scan : credentials in pushes: %s\n", o.secretsMode)
+	_, _ = fmt.Fprintf(out, "  next : mei remote add meiosis --url %s/%s.git && git push meiosis main\n", base, o.repoName)
 }

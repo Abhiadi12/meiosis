@@ -1,4 +1,7 @@
-package server
+// Package repoconfig reads the per-repository settings that `mei init` writes to
+// .meiosis/config.yaml and decides how strictly a process enforces capability
+// tokens. It has no dependency on the servers that use it.
+package repoconfig
 
 import (
 	"fmt"
@@ -21,7 +24,7 @@ import (
 // config says strict: true (FR-1.3) does not permit even that.
 func ResolveEnforcement(explicit, dbPath string, allowUnauth bool, warn io.Writer) (issuerPath string, strict bool, err error) {
 	dir := filepath.Dir(dbPath)
-	strict = RepoIsStrict(dir)
+	strict = IsStrict(dir)
 	if allowUnauth && strict {
 		return "", true, fmt.Errorf("--allow-unauthenticated is refused: %s sets strict: true, so every call must carry a capability token", filepath.Join(dir, "config.yaml"))
 	}
@@ -41,9 +44,9 @@ func ResolveEnforcement(explicit, dbPath string, allowUnauth bool, warn io.Write
 	return "", strict, fmt.Errorf("capability enforcement is required but there is no issuer key: pass --issuer-pubkey, run `mei init` so %s exists, or pass --allow-unauthenticated to opt out", beside)
 }
 
-// RepoIsStrict reports whether the config in dir turns strict mode on. A
+// IsStrict reports whether the config in dir turns strict mode on. A
 // missing or unreadable config means it does not.
-func RepoIsStrict(dir string) bool {
+func IsStrict(dir string) bool {
 	cfg := viper.New()
 	cfg.SetConfigFile(filepath.Join(dir, "config.yaml"))
 	if err := cfg.ReadInConfig(); err != nil {
@@ -52,9 +55,9 @@ func RepoIsStrict(dir string) bool {
 	return cfg.GetBool("strict")
 }
 
-// RepoSecretsMode reads the credential-scanning mode from the config in dir.
+// SecretsMode reads the credential-scanning mode from the config in dir.
 // A missing key means "warn".
-func RepoSecretsMode(dir string) string {
+func SecretsMode(dir string) string {
 	cfg := viper.New()
 	cfg.SetConfigFile(filepath.Join(dir, "config.yaml"))
 	if err := cfg.ReadInConfig(); err != nil {

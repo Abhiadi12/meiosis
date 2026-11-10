@@ -7,8 +7,10 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
+// IntentStatus is the lifecycle state of an Intent, held in its IntentState.
 type IntentStatus string
 
+// The statuses an Intent can have.
 const (
 	IntentStatusOpen       IntentStatus = "open"
 	IntentStatusAttempting IntentStatus = "attempting"
@@ -17,26 +19,32 @@ const (
 	IntentStatusStale      IntentStatus = "stale"
 )
 
+// Criterion is one acceptance criterion of an Intent.
 type Criterion struct {
 	Text  string         `json:"text"`
 	Check map[string]any `json:"check,omitempty"`
 }
 
+// ScopeMode says whether a path outside the scope is refused or only recorded.
 type ScopeMode string
 
+// The scope modes.
 const (
 	ScopeModeEnforce ScopeMode = "enforce"
 	ScopeModeWarn    ScopeMode = "warn"
 )
 
+// Scope is the set of paths an Intent permits changing: allow and deny globs, deny taking precedence.
 type Scope struct {
 	Allow []string  `json:"allow"`
 	Deny  []string  `json:"deny,omitempty"`
 	Mode  ScopeMode `json:"mode"`
 }
 
+// ContextPinKind says what a ContextPin refers to.
 type ContextPinKind string
 
+// The kinds of context pin.
 const (
 	ContextPinKindSpec       ContextPinKind = "spec"
 	ContextPinKindADR        ContextPinKind = "adr"
@@ -45,12 +53,14 @@ const (
 	ContextPinKindConvention ContextPinKind = "convention"
 )
 
+// ContextPin records the digest of a document the Intent was written against.
 type ContextPin struct {
 	Ref    string         `json:"ref"`
 	Digest string         `json:"digest"`
 	Kind   ContextPinKind `json:"kind"`
 }
 
+// Intent is the immutable, signed statement of what a change is for and what it may touch. See spec/v1/intent.md.
 type Intent struct {
 	ID          string       `json:"id"`
 	Repo        string       `json:"repo"`
@@ -68,6 +78,7 @@ type Intent struct {
 	Signature   string       `json:"signature"`
 }
 
+// Validate reports whether the intent is well formed; it checks shape, not signatures.
 func (i Intent) Validate() error {
 	if !validContentID(i.ID, "int_") || strings.TrimSpace(i.Repo) == "" || strings.TrimSpace(i.Title) == "" || strings.TrimSpace(i.Goal) == "" || len(i.Acceptance) == 0 || !validPrincipalID(i.CreatedBy) || i.CreatedAt.IsZero() || i.Signature == "" {
 		return ErrInvalidIntent
@@ -96,6 +107,7 @@ func (i Intent) Validate() error {
 	return nil
 }
 
+// Validate reports whether the scope is well formed, including that each glob parses.
 func (s Scope) Validate() error {
 	if len(s.Allow) == 0 || (s.Mode != ScopeModeEnforce && s.Mode != ScopeModeWarn) {
 		return ErrInvalidIntent
@@ -127,6 +139,7 @@ type IntentState struct {
 	Signature    string       `json:"signature"`
 }
 
+// Validate reports whether the state record is well formed; it checks shape, not signatures.
 func (s IntentState) Validate() error {
 	if !validContentID(s.Intent, "int_") || !validPrincipalID(s.UpdatedBy) || s.UpdatedAt.IsZero() || strings.TrimSpace(s.Signature) == "" {
 		return ErrInvalidIntent

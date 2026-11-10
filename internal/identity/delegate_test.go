@@ -248,7 +248,7 @@ func TestVerifyRejectsHandSignedWideningAndForgedChains(t *testing.T) {
 	}
 
 	// Signed by someone who does not hold the parent.
-	forged := handSigned(t, root, a.agentB.PrivateKey, func(c *specv1.CapabilityToken) {})
+	forged := handSigned(t, root, a.agentB.PrivateKey, func(*specv1.CapabilityToken) {})
 	if err := Verify(forged, a.human.PublicKey, nil, now); !errors.Is(err, ErrTokenAltered) {
 		t.Errorf("signed by a non-holder = %v, want ErrTokenAltered", err)
 	}
@@ -272,8 +272,10 @@ func TestVerifyRejectsHandSignedWideningAndForgedChains(t *testing.T) {
 	}
 
 	// A chain that does not start at a human is not a chain of authority.
-	agentRoot, err := Issue(IssueParams{Principal: "agent:a", IssuedBy: "agent:rogue", Intent: specv1.CapabilityTokenAnyIntent,
-		Scope: root.Scope, HolderKey: a.agentA.PublicKey}, a.human.PrivateKey)
+	agentRoot, err := Issue(IssueParams{
+		Principal: "agent:a", IssuedBy: "agent:rogue", Intent: specv1.CapabilityTokenAnyIntent,
+		Scope: root.Scope, HolderKey: a.agentA.PublicKey,
+	}, a.human.PrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,12 +350,39 @@ func TestGlobCovers(t *testing.T) {
 		outer, inner string
 		want         bool
 	}{
-		{"src/**", "src/**", true}, {"src/**", "src/a/**", true}, {"src/**", "src/a/b.go", true}, {"src/**", "src", false},
-		{"**", "anything/at/all", true}, {"**", "**", true}, {"*", "a", true}, {"*", "a/b", false},
-		{"src/**/*.go", "src/a/b.go", true}, {"src/**/*.go", "src/**/*_test.go", false}, {"src/**/*.go", "src/**", false}, {"a/**/**", "a", false}, {"a*/**", "a*", false}, {"*/a*/**", "*b/a/**", false}, {"*/?/**/**", "[ab]/?", false}, {"a/**", "a/**", true}, {"a/**", "a/b/**", true}, {"a/**/**", "a/**/**", true}, {"src/**", "src/**/*", true},
-		{"src/a/**", "src/**", false}, {"src/*", "src/a", true}, {"src/*", "src/a/b", false}, {"src/*", "src/**", false},
-		{"docs/**", "src/**", false}, {"a/b", "a/b", true}, {"a/b", "a/**", false}, {"a?", "ab", true}, {"a?", "a*", false},
-		{"{a,b}/x", "a/x", false}, {"{a,b}/x", "{a,b}/x", true}, {"", "a", false}, {"/a", "/a", true}, {"/a", "a", false},
+		{"src/**", "src/**", true},
+		{"src/**", "src/a/**", true},
+		{"src/**", "src/a/b.go", true},
+		{"src/**", "src", false},
+		{"**", "anything/at/all", true},
+		{"**", "**", true},
+		{"*", "a", true},
+		{"*", "a/b", false},
+		{"src/**/*.go", "src/a/b.go", true},
+		{"src/**/*.go", "src/**/*_test.go", false},
+		{"src/**/*.go", "src/**", false},
+		{"a/**/**", "a", false},
+		{"a*/**", "a*", false},
+		{"*/a*/**", "*b/a/**", false},
+		{"*/?/**/**", "[ab]/?", false},
+		{"a/**", "a/**", true},
+		{"a/**", "a/b/**", true},
+		{"a/**/**", "a/**/**", true},
+		{"src/**", "src/**/*", true},
+		{"src/a/**", "src/**", false},
+		{"src/*", "src/a", true},
+		{"src/*", "src/a/b", false},
+		{"src/*", "src/**", false},
+		{"docs/**", "src/**", false},
+		{"a/b", "a/b", true},
+		{"a/b", "a/**", false},
+		{"a?", "ab", true},
+		{"a?", "a*", false},
+		{"{a,b}/x", "a/x", false},
+		{"{a,b}/x", "{a,b}/x", true},
+		{"", "a", false},
+		{"/a", "/a", true},
+		{"/a", "a", false},
 	} {
 		if got := globCovers(c.outer, c.inner); got != c.want {
 			t.Errorf("globCovers(%q, %q) = %t, want %t", c.outer, c.inner, got, c.want)
@@ -394,13 +423,13 @@ func matches(pattern, path string) bool {
 func TestPropertyGlobCoversIsSound(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	covered := 0
-	for i := 0; i < 30000; i++ {
+	for range 30000 {
 		outer, inner := randPattern(r), randPattern(r)
 		if !globCovers(outer, inner) {
 			continue
 		}
 		covered++
-		for j := 0; j < 60; j++ {
+		for range 60 {
 			path := randPath(r)
 			if matches(inner, path) && !matches(outer, path) {
 				t.Fatalf("globCovers(%q, %q) is true but %q matches inner and not outer", outer, inner, path)
@@ -442,7 +471,7 @@ func allowed(s specv1.Scope, path string) bool {
 func TestPropertyAcceptedDelegationNeverWidensScope(t *testing.T) {
 	r := rand.New(rand.NewSource(2))
 	accepted := 0
-	for i := 0; i < 40000; i++ {
+	for range 40000 {
 		parent := randScope(r, specv1.ScopeModeEnforce)
 		child := randScope(r, specv1.ScopeModeEnforce)
 		if r.Intn(3) == 0 {
@@ -456,7 +485,7 @@ func TestPropertyAcceptedDelegationNeverWidensScope(t *testing.T) {
 			continue
 		}
 		accepted++
-		for j := 0; j < 80; j++ {
+		for range 80 {
 			path := randPath(r)
 			if allowed(child, path) && !allowed(parent, path) {
 				t.Fatalf("parent %+v / child %+v accepted, but %q is allowed by the child and not by the parent", parent, child, path)
@@ -483,7 +512,7 @@ func TestPropertyOperationsAndSpendOnlyNarrow(t *testing.T) {
 		}
 		return out
 	}
-	for i := 0; i < 20000; i++ {
+	for range 20000 {
 		parent, child := pick(), pick()
 		if operationsNarrower(parent, child) != nil {
 			continue

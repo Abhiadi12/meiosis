@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/mindfire-test/meiosis/pkg/storage"
@@ -182,7 +184,7 @@ func TestOpenHandlesAwkwardPathsAndConcurrentWriters(t *testing.T) {
 	done := make(chan error, 2)
 	for i, s := range []*Store{first, second} {
 		go func() {
-			for n := 0; n < 50; n++ {
+			for n := range 50 {
 				if putErr := s.Put(ctx, storage.KindIntent, fmt.Sprintf("k-%d-%d", i, n), []byte("v")); putErr != nil {
 					done <- putErr
 					return
@@ -199,5 +201,24 @@ func TestOpenHandlesAwkwardPathsAndConcurrentWriters(t *testing.T) {
 	records, err := first.List(ctx, storage.KindIntent)
 	if err != nil || len(records) != 100 {
 		t.Fatalf("List() = %d records, %v; want 100", len(records), err)
+	}
+}
+
+func TestDatabaseFileIsPrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX modes")
+	}
+	path := filepath.Join(t.TempDir(), "meiosis.db")
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode&0o077 != 0 {
+		t.Fatalf("database mode = %v, want no access for group or others", mode)
 	}
 }

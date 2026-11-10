@@ -41,15 +41,20 @@ var forbidden = map[string][]string{
 	"internal/pushhook": {"internal/mcp", "internal/server", "internal/cli"},
 	"internal/server":   {"internal/cli"},
 
-	// Entry points are thin.
-	"cmd/mei": {"internal/graph", "internal/identity", "internal/mcp", "internal/server", "internal/evidence", "pkg/..."},
+	// The stdio daemon is a transport of its own: beside the server, below main.
+	"internal/daemon":     {"internal/cli", "internal/server", "internal/pushhook"},
+	"internal/repoconfig": {"internal/...", "pkg/..."},
+
+	// Entry points are thin: they call one internal package and nothing else.
+	"cmd/mei":      {"internal/graph", "internal/identity", "internal/mcp", "internal/server", "internal/evidence", "internal/daemon", "pkg/..."},
+	"cmd/meiosisd": {"internal/graph", "internal/identity", "internal/mcp", "internal/server", "internal/evidence", "internal/cli", "pkg/..."},
 }
 
 // storageBackends are the only implementations of pkg/storage. Code outside the
 // composition roots must use the interface, so a second backend is a change in
 // one place.
 var storageBackendAllowedIn = map[string]bool{
-	"cmd/meiosisd":      true,
+	"internal/daemon":   true,
 	"internal/cli":      true, // opens the store for every command
 	"internal/server":   true,
 	"internal/pushhook": true, // a separate process, opens its own handle
@@ -139,6 +144,28 @@ func TestNoHTTPClientInDomainPackages(t *testing.T) {
 			if imp == "net/http" || imp == "net" {
 				t.Errorf("%s imports %s; the domain core does no networking", rel, imp)
 			}
+		}
+	}
+}
+
+// exempt packages are deliberately outside the dependency table: the top of the
+// stack (the CLI may use anything), tests, tools and the specification.
+var exempt = map[string]bool{
+	"internal/cli":          true,
+	"internal/acceptance":   true,
+	"internal/architecture": true,
+	"spec":                  true,
+	"spec/conformance":      true,
+	"tools/commitlint":      true,
+}
+
+// A new package must be placed in the layering, not left unconstrained: either
+// give it rules in `forbidden` or, if it really is top-level, list it in `exempt`.
+func TestEveryPackageIsClassified(t *testing.T) {
+	for _, p := range listPackages(t) {
+		rel := strings.TrimPrefix(p.ImportPath, module)
+		if _, ok := forbidden[rel]; !ok && !exempt[rel] {
+			t.Errorf("%s has no entry in the dependency table (docs/architecture.md): add rules for it", rel)
 		}
 	}
 }

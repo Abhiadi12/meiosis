@@ -7,13 +7,16 @@ First off, thank you for considering contributing to meiosis! Contributions are 
 1. **Ensure you have Go installed** (preferably the latest stable version, e.g., 1.25+).
 2. **Fork the repository** on GitHub.
 3. **Clone your fork locally**: `git clone https://github.com/YOUR_USERNAME/meiosis.git`
-4. **Install Git Hooks** to enforce commit message standards locally:
-   ```bash
-   ./scripts/install-hooks.sh
-   ```
+4. **Install Git hooks** (`make hooks`). They are managed by [lefthook](https://lefthook.dev), a single Go
+   binary (installed with `go install` if missing), so no Node toolchain is needed:
+   - `commit-msg`: Conventional Commits, checked by `tools/commitlint` (rules in `.commitlintrc.yaml`)
+   - `pre-commit`: formats staged Go files (gofumpt and goimports) and checks `go.mod` is tidy
+   - `pre-push`: `golangci-lint` and the short test suite
+
+   Skip them in an emergency with `LEFTHOOK=0 git commit ...`; CI runs the same checks.
 5. **Check everything works** (needs `git`, Go, and `golangci-lint`; `lsof` makes the air-gap check run):
    ```bash
-   make check      # formatting, vet, lint, go.mod tidy, tests with -race
+   make check      # formatting, lint (includes go vet), go.mod tidy, tests with -race
    make help       # every target: acceptance, cover, fuzz, bench, vectors, cross, vuln
    ```
 

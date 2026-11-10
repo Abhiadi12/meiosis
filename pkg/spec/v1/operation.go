@@ -8,6 +8,7 @@ import (
 // OperationKind names what an Operation did to a workspace.
 type OperationKind string
 
+// The kinds of Operation a workspace log can hold.
 const (
 	OperationOpen   OperationKind = "open"   // the workspace was created
 	OperationWrite  OperationKind = "write"  // a file was written
@@ -67,6 +68,7 @@ type Operation struct {
 	Signature string    `json:"signature"`
 }
 
+// Validate reports whether the operation is well formed; it checks shape, not the signature.
 func (o Operation) Validate() error {
 	if !validContentID(o.ID, "op_") || !validContentID(o.Attempt, "att_") || !validPrincipalID(o.By) || o.At.IsZero() || strings.TrimSpace(o.Signature) == "" || o.Seq < 0 {
 		return ErrInvalidOperation

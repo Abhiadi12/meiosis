@@ -8,6 +8,7 @@ import (
 	"errors"
 )
 
+// Errors returned by this package; test with errors.Is.
 var (
 	ErrNilTree      = errors.New("world tree must not be nil")
 	ErrInvalidPath  = errors.New("invalid world path")
@@ -37,6 +38,7 @@ type Snapshotter interface {
 // ChangeKind identifies how a path differs between two worlds.
 type ChangeKind string
 
+// The kinds of change between two worlds.
 const (
 	Added    ChangeKind = "added"
 	Modified ChangeKind = "modified"

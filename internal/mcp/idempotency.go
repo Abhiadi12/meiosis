@@ -40,7 +40,7 @@ func idempotencyKey(args json.RawMessage) (string, error) {
 		Key *string `json:"idempotency_key"`
 	}
 	if err := json.Unmarshal(args, &env); err != nil || env.Key == nil {
-		return "", nil // not parseable, or no key: the handler will report any real problem
+		return "", nil //nolint:nilerr // not parseable, or no key: the tool handler reports any real problem
 	}
 	key := *env.Key
 	if key == "" || len(key) > maxIdempotencyKey || strings.TrimSpace(key) != key {
@@ -88,7 +88,7 @@ func (s *Server) idempotent(ctx context.Context, tool, key string, args json.Raw
 	}
 
 	lock, _ := s.idemLocks.LoadOrStore(id, &sync.Mutex{})
-	mu := lock.(*sync.Mutex)
+	mu, _ := lock.(*sync.Mutex) // only *sync.Mutex values are ever stored
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -98,8 +98,10 @@ func (s *Server) idempotent(ctx context.Context, tool, key string, args json.Raw
 	}
 	if found {
 		if rec.Digest != digest {
-			return nil, &rpcError{code: ErrCodeInvalidParams, cause: ErrIdempotencyConflict,
-				message: fmt.Sprintf("idempotency key %q was used for a different %s request; use a new key for a new operation", key, tool)}
+			return nil, &rpcError{
+				code: ErrCodeInvalidParams, cause: ErrIdempotencyConflict,
+				message: fmt.Sprintf("idempotency key %q was used for a different %s request; use a new key for a new operation", key, tool),
+			}
 		}
 		// A replay must still be authorised: a revoked or foreign token does not
 		// get to read back what a previous call returned.

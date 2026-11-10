@@ -41,7 +41,7 @@ func newHookCommand() *cobra.Command {
 				if err == nil {
 					return nil
 				}
-				var rejection *pushhook.Rejection
+				var rejection *pushhook.RejectionError
 				if errors.As(err, &rejection) {
 					return silentError{err} // PreReceive already told the pusher why
 				}

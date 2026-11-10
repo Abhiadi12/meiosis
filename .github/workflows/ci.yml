@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, dev, "feat/**" ]
+    branches: [ main, dev ]  # feature branches are covered by their pull request
   pull_request:
     branches: [ main, dev ]
 
@@ -21,17 +21,17 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Formatting
-        run: make fmt-check
-      - name: Vet
-        run: make vet
-      - name: go.mod is tidy
-        run: make tidy-check
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           args: --timeout=5m
+      - name: Formatting
+        run: make fmt-check
+      - name: go.mod is tidy
+        run: make tidy-check
+      - name: Every release target builds without cgo
+        run: make cross
       - name: Vulnerabilities
         run: make vuln
 
@@ -46,26 +46,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Build
-        run: make build
-      - name: Test
-        run: make test
-
-  # The exit-criterion walkthrough, the adversarial scenarios and the air-gap
-  # check drive the real binaries (internal/acceptance). They also run in
-  # `make test`; this job makes lsof a hard requirement so the socket
-  # inspection can never be skipped silently.
-  acceptance:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      # make test includes internal/acceptance (the exit-criterion walkthrough,
+      # adversarial scenarios, air-gap check). MEI_REQUIRE_SOCKET_CHECK makes
+      # lsof mandatory so the socket inspection can never be skipped silently.
       - name: Ensure lsof
         run: command -v lsof >/dev/null || sudo apt-get install -y lsof
-      - name: Acceptance
-        run: make acceptance
+      - name: Test
+        env:
+          MEI_REQUIRE_SOCKET_CHECK: "1"
+        run: make test
 
   # A second implementation of the format's hashing and signing must agree with
   # the Go one on the known-answer vectors.
@@ -78,13 +67,3 @@ jobs:
           python-version: "3.12"
       - run: pip install blake3 cryptography
       - run: make vectors
-
-  cross-compile:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Every release target builds without cgo
-        run: make cross

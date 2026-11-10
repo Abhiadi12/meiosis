@@ -104,7 +104,7 @@ records' tokens) but cannot sign new ones, so back the keys up separately.`,
 				manifest.Repos = append(manifest.Repos, e.Name())
 			}
 			if data, readErr := os.ReadFile(filepath.Join(meiosis, "config.yaml")); readErr == nil {
-				if err = os.WriteFile(filepath.Join(dest, "config.yaml"), data, 0o644); err != nil {
+				if err = os.WriteFile(filepath.Join(dest, "config.yaml"), data, 0o644); err != nil { //nolint:gosec // world-readable by design: not secret
 					return err
 				}
 			}
@@ -117,7 +117,7 @@ records' tokens) but cannot sign new ones, so back the keys up separately.`,
 					if err = os.MkdirAll(filepath.Join(dest, "keys"), 0o700); err != nil {
 						return err
 					}
-					if err = os.WriteFile(filepath.Join(dest, "keys", k), data, 0o600); err != nil {
+					if err = os.WriteFile(filepath.Join(dest, "keys", k), data, 0o600); err != nil { //nolint:gosec // k is one of the fixed key file names
 						return err
 					}
 				}
@@ -126,7 +126,7 @@ records' tokens) but cannot sign new ones, so back the keys up separately.`,
 			if err != nil {
 				return err
 			}
-			if err = os.WriteFile(filepath.Join(dest, "MANIFEST.json"), encoded, 0o644); err != nil {
+			if err = os.WriteFile(filepath.Join(dest, "MANIFEST.json"), encoded, 0o644); err != nil { //nolint:gosec // world-readable by design: not secret
 				return err
 			}
 			out := cmd.OutOrStdout()
@@ -235,7 +235,7 @@ It refuses to overwrite an existing database unless --force is given.`,
 			}
 			if _, statErr := os.Stat(filepath.Join(meiosis, "config.yaml")); statErr != nil {
 				if cfg, readErr := os.ReadFile(filepath.Join(src, "config.yaml")); readErr == nil {
-					_ = os.WriteFile(filepath.Join(meiosis, "config.yaml"), cfg, 0o644)
+					_ = os.WriteFile(filepath.Join(meiosis, "config.yaml"), cfg, 0o644) //nolint:gosec // world-readable by design: not secret
 				}
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "restored %s: database, %d repositor(ies), %d key file(s)\n", src, len(manifest.Repos), restoredKeys)

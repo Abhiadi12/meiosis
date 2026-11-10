@@ -319,7 +319,6 @@ func (s *Store) RevertOperation(ctx context.Context, p RevertParams, key ed25519
 		switch target.Kind {
 		case specv1.OperationOpen, specv1.OperationFork:
 			return fmt.Errorf("%w: %s only creates the workspace", ErrNotUndoable, target.Kind)
-
 		}
 		if isWorldOp(target) {
 			return s.revertWorld(ctx, tx, attempt, head, target, p.Author, key, &result)
@@ -361,7 +360,7 @@ func (s *Store) revertWorld(ctx context.Context, tx storage.Tx, attempt specv1.A
 		return err
 	}
 	if latest != target.ID || target.World == nil || attempt.World != *target.World {
-		return fmt.Errorf("%w: %s is not the latest change to the attempt's world, which is %s", ErrNotUndoable, target.ID, shortWorld(attempt.World))
+		return fmt.Errorf("%w: %s is not the latest change to the attempt's world, which is %s", ErrNotUndoable, target.ID, attempt.World.Short())
 	}
 
 	current := attempt.World
@@ -383,8 +382,6 @@ func (s *Store) revertWorld(ctx context.Context, tx storage.Tx, attempt specv1.A
 func isWorldOp(op specv1.Operation) bool {
 	return op.Kind == specv1.OperationCommit || (op.Kind == specv1.OperationRevert && op.Path == "" && op.World != nil)
 }
-
-func shortWorld(w specv1.WorldHash) string { return w.String()[:12] }
 
 // latestWorldOp finds the newest operation in attemptID's own log that changed
 // the attempt's world.

@@ -79,10 +79,12 @@ func LoadEncodedPublicKey(publicKey string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(data), nil
 }
 
+// PublicKeyBase64 returns the public key as standard base64, the form stored in key files and tokens.
 func (k KeyPair) PublicKeyBase64() string {
 	return base64.StdEncoding.EncodeToString(k.PublicKey)
 }
 
+// PrivateKeyBase64 returns the private key as standard base64. Treat the result as a secret.
 func (k KeyPair) PrivateKeyBase64() string {
 	return base64.StdEncoding.EncodeToString(k.PrivateKey)
 }

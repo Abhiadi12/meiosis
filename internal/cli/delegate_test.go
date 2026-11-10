@@ -58,8 +58,10 @@ func TestInitReplacesATokenThatCannotBeDelegated(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An old-style token: valid, but issued without a holder key.
-	old, err := identity.Issue(identity.IssueParams{Principal: "agent:meiosis", IssuedBy: "human:x", Intent: specv1.CapabilityTokenAnyIntent,
-		Scope: specv1.Scope{Allow: []string{"**"}, Mode: specv1.ScopeModeEnforce}}, human.PrivateKey)
+	old, err := identity.Issue(identity.IssueParams{
+		Principal: "agent:meiosis", IssuedBy: "human:x", Intent: specv1.CapabilityTokenAnyIntent,
+		Scope: specv1.Scope{Allow: []string{"**"}, Mode: specv1.ScopeModeEnforce},
+	}, human.PrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,8 +149,10 @@ func TestDelegateRefusesToWidenAndLeavesNoKeyBehind(t *testing.T) {
 	root := initedRepo(t, "--allow", "src/**", "--deny", "src/secret/**")
 	dir := t.TempDir()
 	subKey := filepath.Join(dir, "k")
-	base := []string{"intent", "delegate", "--repo", root, "--token", filepath.Join(root, ".agents", "meiosis-capability.json"),
-		"--key", filepath.Join(root, ".meiosis", "agent.private.key"), "--to", "agent:x"}
+	base := []string{
+		"intent", "delegate", "--repo", root, "--token", filepath.Join(root, ".agents", "meiosis-capability.json"),
+		"--key", filepath.Join(root, ".meiosis", "agent.private.key"), "--to", "agent:x",
+	}
 
 	for name, extra := range map[string][]string{
 		"wider paths":     {"--generate-key", subKey, "--allow", "**"},
@@ -168,8 +172,10 @@ func TestDelegateRefusesToWidenAndLeavesNoKeyBehind(t *testing.T) {
 
 func TestDelegateRefusesBadInputs(t *testing.T) {
 	root := initedRepo(t)
-	good := []string{"intent", "delegate", "--repo", root, "--token", filepath.Join(root, ".agents", "meiosis-capability.json"),
-		"--key", filepath.Join(root, ".meiosis", "agent.private.key"), "--to", "agent:x"}
+	good := []string{
+		"intent", "delegate", "--repo", root, "--token", filepath.Join(root, ".agents", "meiosis-capability.json"),
+		"--key", filepath.Join(root, ".meiosis", "agent.private.key"), "--to", "agent:x",
+	}
 	humanKey := filepath.Join(root, ".meiosis", "human.private.key")
 
 	if _, err := run("", "intent", "delegate", "--repo", root); err == nil {
@@ -231,8 +237,10 @@ func TestChainShowsWhoAuthorisedEachWrite(t *testing.T) {
 	}
 	// A record whose chain the repository's issuer never signed.
 	stranger, _ := crypto.GenerateKeyPair()
-	bogus, err := identity.Issue(identity.IssueParams{Principal: "agent:evil", IssuedBy: "human:mallory", Intent: specv1.CapabilityTokenAnyIntent,
-		Scope: specv1.Scope{Allow: []string{"**"}, Mode: specv1.ScopeModeEnforce}}, stranger.PrivateKey)
+	bogus, err := identity.Issue(identity.IssueParams{
+		Principal: "agent:evil", IssuedBy: "human:mallory", Intent: specv1.CapabilityTokenAnyIntent,
+		Scope: specv1.Scope{Allow: []string{"**"}, Mode: specv1.ScopeModeEnforce},
+	}, stranger.PrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}

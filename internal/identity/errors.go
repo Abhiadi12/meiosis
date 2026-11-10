@@ -2,6 +2,7 @@ package identity
 
 import "errors"
 
+// Errors returned by this package; test with errors.Is.
 var (
 	ErrInvalidParams = errors.New("identity: invalid issue parameters")
 	ErrTokenAltered  = errors.New("identity: capability token signature invalid")

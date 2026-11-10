@@ -228,7 +228,7 @@ func TestInitBareConfiguresServingRulesAndIsIdempotent(t *testing.T) {
 	needGit(t)
 	dir := filepath.Join(t.TempDir(), "repos", "demo.git")
 	ctx := context.Background()
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := InitBare(ctx, "", dir); err != nil {
 			t.Fatalf("InitBare #%d: %v", i+1, err)
 		}
@@ -327,7 +327,7 @@ func TestEachAddedLineForANewRefSeesOnlyItsOwnCommitsAndHonoursTheLimit(t *testi
 	base := commit(t, dir, "base")
 	git(t, dir, "checkout", "-q", "-b", "topic", base)
 	var lines []string
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		lines = append(lines, "added line number "+strings.Repeat("x", 40))
 	}
 	write(t, dir, "big.txt", strings.Join(lines, "\n")+"\n")

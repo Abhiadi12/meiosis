@@ -1,8 +1,9 @@
-package main
+package daemon
 
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,4 +162,8 @@ func TestExplicitIssuerKeyOverridesTheOneBesideTheDatabase(t *testing.T) {
 	if !strings.Contains(stdout.String(), "capability_token is required") {
 		t.Fatalf("response = %s", stdout.String())
 	}
+}
+
+func run(args []string, stdin io.Reader, stdout io.Writer) error {
+	return Run(args, stdin, stdout, "test")
 }

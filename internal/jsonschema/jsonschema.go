@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -104,7 +105,11 @@ func Validate(schema, document []byte) error {
 	if err != nil {
 		return &Error{Path: "$", Message: "not valid JSON: " + err.Error()}
 	}
-	return validate(s.(map[string]any), d, "$", 0)
+	schemaObject, ok := s.(map[string]any)
+	if !ok {
+		return &Error{Path: "$", Message: "the schema must be a JSON object"}
+	}
+	return validate(schemaObject, d, "$", 0)
 }
 
 func decode(data []byte) (any, error) {
@@ -269,9 +274,11 @@ func joinOr(names []string) string {
 		return names[0]
 	}
 	out := names[0]
+	var outSb276 strings.Builder
 	for _, n := range names[1:] {
-		out += " or " + n
+		outSb276.WriteString(" or " + n)
 	}
+	out += outSb276.String()
 	return out
 }
 

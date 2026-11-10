@@ -33,7 +33,7 @@ func TestUnified(t *testing.T) {
 
 func TestSeparateChangesGetSeparateHunksWhenFarApart(t *testing.T) {
 	var before, after []string
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		before = append(before, "line"+string(rune('a'+i%26)))
 	}
 	after = append([]string(nil), before...)
@@ -53,7 +53,7 @@ func TestBinaryAndHugeInputsGetANoteNotADiff(t *testing.T) {
 		t.Fatalf("huge: %q", got[:min(80, len(got))])
 	}
 	var a, b strings.Builder
-	for i := 0; i < MaxMiddleLines+10; i++ {
+	for i := range MaxMiddleLines + 10 {
 		a.WriteString("a" + strings.Repeat("x", i%7) + "\n")
 		b.WriteString("b" + strings.Repeat("y", i%5) + "\n")
 	}

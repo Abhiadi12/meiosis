@@ -4,6 +4,7 @@ package gitserver
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -179,7 +180,7 @@ func relayCGI(w http.ResponseWriter, reader *bufio.Reader) error {
 		fields := strings.Fields(value)
 		if len(fields) == 0 {
 			http.Error(w, "bad gateway", http.StatusBadGateway)
-			return fmt.Errorf("empty git http-backend status")
+			return errors.New("empty git http-backend status")
 		}
 		code, parseErr := strconv.Atoi(fields[0])
 		if parseErr != nil {
@@ -221,11 +222,11 @@ func relayCGI(w http.ResponseWriter, reader *bufio.Reader) error {
 
 func validatePath(requestPath string) error {
 	if requestPath == "" || !strings.HasPrefix(requestPath, "/") {
-		return fmt.Errorf("invalid repository path")
+		return errors.New("invalid repository path")
 	}
 	clean := path.Clean(requestPath)
 	if clean != requestPath || strings.Contains(requestPath, "..") {
-		return fmt.Errorf("invalid repository path")
+		return errors.New("invalid repository path")
 	}
 	return nil
 }

@@ -113,7 +113,7 @@ func TestBackupIsConsistentWhileTheDatabaseIsBeingWritten(t *testing.T) {
 			}, keys.PrivateKey)
 		}
 	}()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		dest := filepath.Join(t.TempDir(), "bk")
 		mustRun(t, "", "backup", dest, "--repo", root)
 		snap, err := sqlite.Open(filepath.Join(dest, backupDBName))

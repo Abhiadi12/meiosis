@@ -2,6 +2,7 @@ package cli
 
 import (
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,7 +44,7 @@ func loadIssuerKey(settings *Settings, explicit string) (ed25519.PublicKey, erro
 		}
 		path = filepath.Join(root, ".meiosis", "human.public.key")
 		if _, statErr := os.Stat(path); statErr != nil {
-			return nil, nil
+			return nil, nil //nolint:nilerr // no trust key on disk is not an error: the chain is then not verified here
 		}
 	}
 	data, err := os.ReadFile(path)
@@ -78,10 +79,10 @@ create a keypair and write the private key where you say.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if tokenPath == "" || keyPath == "" || to == "" {
-				return fmt.Errorf("--token, --key and --to are required")
+				return errors.New("--token, --key and --to are required")
 			}
 			if holderKeyPath != "" && generateKey != "" {
-				return fmt.Errorf("give --holder-key or --generate-key, not both")
+				return errors.New("give --holder-key or --generate-key, not both")
 			}
 			parent, err := loadToken(tokenPath)
 			if err != nil {
@@ -206,9 +207,7 @@ func chainLine(token specv1.CapabilityToken) string {
 }
 
 func newChainCommand(settings *Settings) *cobra.Command {
-	var (
-		dbPath, issuerPath string
-	)
+	var dbPath, issuerPath string
 	cmd := &cobra.Command{
 		Use:   "chain [id]",
 		Short: "Show who authorised each write, back to the originating human",

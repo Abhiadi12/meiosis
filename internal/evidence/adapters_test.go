@@ -86,7 +86,7 @@ func TestJUnit(t *testing.T) {
 func TestJUnitCapsListedFailures(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("<testsuite name=\"s\">")
-	for i := 0; i < maxFailures+30; i++ {
+	for range maxFailures + 30 {
 		b.WriteString(`<testcase name="t"><failure message="x"/></testcase>`)
 	}
 	b.WriteString("</testsuite>")
@@ -253,12 +253,19 @@ func TestEveryAdapterPayloadSatisfiesItsKindSchema(t *testing.T) {
 		file   string
 		opts   Options
 	}{
-		{FormatJUnit, "junit_pass.xml", Options{}}, {FormatJUnit, "junit_fail.xml", Options{}}, {FormatJUnit, "junit_empty.xml", Options{}},
-		{FormatGoTest, "gotest_pass.jsonl", Options{}}, {FormatGoTest, "gotest_fail.jsonl", Options{}},
-		{FormatSARIF, "sarif_error.json", Options{}}, {FormatSARIF, "sarif_clean.json", Options{}}, {FormatSARIF, "sarif_error.json", Options{Kind: specv1.EvidenceKindSecurityScan}},
-		{FormatCobertura, "cobertura.xml", Options{MinLineCoverage: &min}}, {FormatCobertura, "cobertura_attrs_only.xml", Options{}},
+		{FormatJUnit, "junit_pass.xml", Options{}},
+		{FormatJUnit, "junit_fail.xml", Options{}},
+		{FormatJUnit, "junit_empty.xml", Options{}},
+		{FormatGoTest, "gotest_pass.jsonl", Options{}},
+		{FormatGoTest, "gotest_fail.jsonl", Options{}},
+		{FormatSARIF, "sarif_error.json", Options{}},
+		{FormatSARIF, "sarif_clean.json", Options{}},
+		{FormatSARIF, "sarif_error.json", Options{Kind: specv1.EvidenceKindSecurityScan}},
+		{FormatCobertura, "cobertura.xml", Options{MinLineCoverage: &min}},
+		{FormatCobertura, "cobertura_attrs_only.xml", Options{}},
 		{FormatLCOV, "lcov.info", Options{}},
-		{FormatCycloneDX, "cyclonedx_vulns.json", Options{}}, {FormatCycloneDX, "cyclonedx_none.json", Options{}},
+		{FormatCycloneDX, "cyclonedx_vulns.json", Options{}},
+		{FormatCycloneDX, "cyclonedx_none.json", Options{}},
 	} {
 		r := mustParse(t, c.format, c.file, c.opts)
 		schema, err := spec.EvidenceSchema(r.Kind)
@@ -329,7 +336,7 @@ func (r *repeatReader) Read(p []byte) (int, error) {
 		return 0, errors.New("EOF not expected: the reader should have been cut off")
 	}
 	n := min(len(p), r.n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		p[i] = 'a'
 	}
 	r.n -= n

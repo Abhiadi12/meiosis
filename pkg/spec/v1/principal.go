@@ -2,13 +2,16 @@ package v1
 
 import "strings"
 
+// PrincipalKind distinguishes humans, agents and services.
 type PrincipalKind string
 
+// The kinds of principal.
 const (
 	PrincipalKindHuman PrincipalKind = "human"
 	PrincipalKindAgent PrincipalKind = "agent"
 )
 
+// Principal is an identity with a public key. See spec/v1/principal.md.
 type Principal struct {
 	ID            string        `json:"id"`
 	Kind          PrincipalKind `json:"kind"`
@@ -17,6 +20,7 @@ type Principal struct {
 	DelegatedFrom string        `json:"delegated_from,omitempty"`
 }
 
+// Validate reports whether the principal is well formed.
 func (p Principal) Validate() error {
 	if !validPrincipalID(p.ID) || (p.Kind != PrincipalKindHuman && p.Kind != PrincipalKindAgent) {
 		return ErrInvalidPrincipal

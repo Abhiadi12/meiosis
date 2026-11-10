@@ -23,6 +23,7 @@ import (
 // Format names a report format an adapter understands.
 type Format string
 
+// Format names the report formats the adapters understand.
 const (
 	FormatGoTest    Format = "gotest"
 	FormatJUnit     Format = "junit"

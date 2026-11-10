@@ -56,7 +56,7 @@ func Unified(name string, before, after []byte, context int) string {
 	}
 
 	edits := make([]edit, 0, len(a)+len(b))
-	for i := 0; i < head; i++ {
+	for i := range head {
 		edits = append(edits, edit{op: ' ', text: a[i]})
 	}
 	edits = append(edits, lcsEdits(ma, mb)...)

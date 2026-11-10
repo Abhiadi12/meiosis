@@ -11,6 +11,15 @@ import (
 	"github.com/mindfire-test/meiosis/pkg/storage"
 )
 
+// ErrInactiveAttempt is returned when work is submitted to an attempt that is no longer open.
+var ErrInactiveAttempt = errors.New("attempt is not active")
+
+// Store persists validated Meiosis objects through a backend-neutral store.
+type Store struct {
+	backend storage.Store
+}
+
+// New returns a Store over the given backend.
 func New(backend storage.Store) (*Store, error) {
 	if backend == nil {
 		return nil, errors.New("graph storage backend must not be nil")
@@ -99,6 +108,7 @@ func loadActiveAttempt(ctx context.Context, tx storage.Tx, attemptID string) (v1
 	return attempt, nil
 }
 
+// GetEvidence returns the stored evidence record with the given ID.
 func (s *Store) GetEvidence(ctx context.Context, id string) (v1.Evidence, error) {
 	data, err := s.backend.Get(ctx, storage.KindEvidence, id)
 	if err != nil {

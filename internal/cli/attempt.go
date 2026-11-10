@@ -61,8 +61,6 @@ func shortID(id string) string {
 	return id
 }
 
-func shortWorld(w specv1.WorldHash) string { return w.String()[:12] }
-
 // resolveAttempt finds the attempt whose ID equals, or uniquely starts with,
 // ref.
 func resolveAttempt(attempts []specv1.Attempt, ref string) (specv1.Attempt, error) {
@@ -123,7 +121,7 @@ func newAttemptListCommand(settings *Settings) *cobra.Command {
 			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
 			_, _ = fmt.Fprintln(tw, "ATTEMPT\tSTATUS\tAUTHOR\tINTENT\tWORLD\tVIOLATIONS")
 			for _, a := range attempts {
-				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\n", shortID(a.ID), a.Status, a.Author, shortID(a.Intent), shortWorld(a.World), len(a.ScopeViolations))
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\n", shortID(a.ID), a.Status, a.Author, shortID(a.Intent), a.World.Short(), len(a.ScopeViolations))
 			}
 			return tw.Flush()
 		},

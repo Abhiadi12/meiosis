@@ -12,6 +12,7 @@ import (
 	"github.com/ucarion/jcs"
 )
 
+// Errors returned by canonicalisation; test with errors.Is.
 var (
 	ErrInvalidCanonicalJSON      = errors.New("invalid JSON for canonicalization")
 	ErrUnsupportedCanonicalValue = errors.New("unsupported value for canonicalization")

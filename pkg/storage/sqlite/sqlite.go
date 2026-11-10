@@ -12,8 +12,15 @@ import (
 
 	"github.com/mindfire-test/meiosis/pkg/storage"
 	"github.com/zeebo/blake3"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" database/sql driver
 )
+
+// sqlExecutor is what both *sql.DB and *sql.Tx provide, so queries are written once.
+type sqlExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
 
 const schema = `
 CREATE TABLE IF NOT EXISTS schema_versions (
@@ -135,7 +142,10 @@ type transaction struct {
 // an isolated in-memory database, primarily in tests.
 func Open(databasePath string) (*Store, error) {
 	if strings.TrimSpace(databasePath) == "" {
-		return nil, fmt.Errorf("database path must not be empty")
+		return nil, errors.New("database path must not be empty")
+	}
+	if err := createPrivate(databasePath); err != nil {
+		return nil, err
 	}
 	db, err := sql.Open("sqlite", dsn(databasePath))
 	if err != nil {
@@ -147,6 +157,20 @@ func Open(databasePath string) (*Store, error) {
 		return nil, err
 	}
 	return store, nil
+}
+
+// createPrivate creates the database file with mode 0600 when it does not exist
+// yet, so records, revocations and evidence are not readable by other local
+// users. SQLite gives its -wal and -shm files the same mode as the database.
+func createPrivate(databasePath string) error {
+	if databasePath == ":memory:" || strings.HasPrefix(databasePath, "file:") {
+		return nil
+	}
+	f, err := os.OpenFile(databasePath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return fmt.Errorf("create SQLite database: %w", err)
+	}
+	return f.Close()
 }
 
 // dsn adds the pragmas several processes need to share one database file: the
@@ -175,7 +199,7 @@ func (s *Store) initialize(ctx context.Context) error {
 // write-ahead log.
 func (s *Store) Backup(ctx context.Context, dest string) error {
 	if strings.TrimSpace(dest) == "" {
-		return fmt.Errorf("backup destination must not be empty")
+		return errors.New("backup destination must not be empty")
 	}
 	if _, err := os.Stat(dest); err == nil {
 		return fmt.Errorf("backup destination %s already exists", dest)
@@ -207,6 +231,7 @@ func (s *Store) IntegrityCheck(ctx context.Context) ([]string, error) {
 	return problems, rows.Err()
 }
 
+// Put stores value under kind and key, replacing any earlier value.
 func (s *Store) Put(ctx context.Context, kind storage.Kind, key string, value []byte) error {
 	return put(ctx, s.db, kind, key, value)
 }
@@ -230,6 +255,7 @@ func put(ctx context.Context, executor sqlExecutor, kind storage.Kind, key strin
 	return nil
 }
 
+// Get returns the value stored under kind and key, or storage.ErrNotFound.
 func (s *Store) Get(ctx context.Context, kind storage.Kind, key string) ([]byte, error) {
 	return get(ctx, s.db, kind, key)
 }
@@ -253,6 +279,7 @@ func get(ctx context.Context, executor sqlExecutor, kind storage.Kind, key strin
 	return append([]byte(nil), value...), nil
 }
 
+// Delete removes the value under kind and key; deleting a missing key is not an error.
 func (s *Store) Delete(ctx context.Context, kind storage.Kind, key string) error {
 	return deleteRecord(ctx, s.db, kind, key)
 }
@@ -276,6 +303,7 @@ func deleteRecord(ctx context.Context, executor sqlExecutor, kind storage.Kind, 
 	return nil
 }
 
+// List returns every value of the given kind, keyed by its key.
 func (s *Store) List(ctx context.Context, kind storage.Kind) (map[string][]byte, error) {
 	return list(ctx, s.db, kind)
 }
@@ -306,6 +334,7 @@ func list(ctx context.Context, executor sqlExecutor, kind storage.Kind) (map[str
 	return result, nil
 }
 
+// Close releases the database. It is safe to call once.
 func (s *Store) Close() error {
 	return s.db.Close()
 }
@@ -349,7 +378,7 @@ func getBlob(ctx context.Context, executor sqlExecutor, id storage.BlobID) ([]by
 // or commit failure rolls back the transaction.
 func (s *Store) Transaction(ctx context.Context, fn func(storage.Tx) error) error {
 	if fn == nil {
-		return fmt.Errorf("transaction callback must not be nil")
+		return errors.New("transaction callback must not be nil")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

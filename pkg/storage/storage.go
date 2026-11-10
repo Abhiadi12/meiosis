@@ -6,18 +6,20 @@ import (
 	"errors"
 )
 
+// Errors returned by a Store; test with errors.Is.
 var (
 	ErrNotFound    = errors.New("storage record not found")
 	ErrInvalidKey  = errors.New("invalid storage key")
 	ErrInvalidBlob = errors.New("invalid blob identifier")
 )
 
-// Kind identifies one of the immutable M0 record collections.
+// Kind identifies a collection of records, each its own keyspace.
 type Kind string
 
 // BlobID is the lower-case hexadecimal BLAKE3-256 identifier of blob content.
 type BlobID string
 
+// The kinds of record a Store holds; each is its own keyspace.
 const (
 	KindPrincipal   Kind = "principals"
 	KindIntent      Kind = "intents"

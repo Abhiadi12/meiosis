@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -193,7 +194,7 @@ func newIntentDeclareCommand(settings *Settings) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			title := args[0]
 			if strings.TrimSpace(title) == "" {
-				return fmt.Errorf("intent title must not be empty")
+				return errors.New("intent title must not be empty")
 			}
 			h, err := openHuman(settings, f)
 			if err != nil {
@@ -249,7 +250,7 @@ func newIntentAuthorizeCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if principal == "" || intentID == "" || issuedBy == "" || issuerKeyPath == "" || len(allow) == 0 {
-				return fmt.Errorf("--principal, --intent, --issuer, --issuer-key and at least one --allow are required")
+				return errors.New("--principal, --intent, --issuer, --issuer-key and at least one --allow are required")
 			}
 
 			keyData, err := os.ReadFile(issuerKeyPath)
@@ -346,7 +347,7 @@ func newIntentRevokeCommand(settings *Settings) *cobra.Command {
 				}
 				tokenID = token.ID
 			default:
-				return fmt.Errorf("give exactly one of a token id argument or --token <file>")
+				return errors.New("give exactly one of a token id argument or --token <file>")
 			}
 
 			if dbPath == "" {

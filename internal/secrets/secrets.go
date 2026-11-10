@@ -99,6 +99,7 @@ func ScanPath(p string) []Finding {
 // Mode is what a repository does with findings.
 type Mode string
 
+// Mode is how a scan result is acted on: ignored, recorded, or enforced.
 const (
 	ModeOff   Mode = "off"
 	ModeWarn  Mode = "warn"

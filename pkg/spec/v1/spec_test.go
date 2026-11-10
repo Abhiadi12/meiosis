@@ -214,5 +214,6 @@ func TestHashCanonicalRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
-func validIntentID() string  { return "int_" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+func validIntentID() string { return "int_" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+
 func validAttemptID() string { return "att_" + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }

@@ -67,6 +67,7 @@ type SecretFinding struct {
 	Confidence string `json:"confidence"` // "high" or "possible"
 }
 
+// Validate reports whether the record is well formed; it checks shape, not the signature.
 func (r RefUpdate) Validate() error {
 	if !validContentID(r.ID, "ref_") || strings.TrimSpace(r.Repo) == "" || !strings.HasPrefix(r.Ref, "refs/") ||
 		!ValidGitObjectID(r.NewCommit) || (r.OldCommit != "" && !ValidGitObjectID(r.OldCommit)) ||

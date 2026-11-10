@@ -35,7 +35,7 @@ func loadWork(root string) (workState, error) {
 	var w workState
 	data, err := os.ReadFile(workStatePath(root))
 	if errors.Is(err, os.ErrNotExist) {
-		return w, fmt.Errorf("no attempt in progress: start one with `mei work start <intent>`")
+		return w, errors.New("no attempt in progress: start one with `mei work start <intent>`")
 	}
 	if err != nil {
 		return w, err
@@ -80,7 +80,7 @@ func newWorkStartCommand(settings *Settings) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if (len(args) == 1) == (task != "") {
-				return fmt.Errorf("give exactly one of an intent (ID or prefix) or --task")
+				return errors.New("give exactly one of an intent (ID or prefix) or --task")
 			}
 			h, err := openHuman(settings, &f)
 			if err != nil {
@@ -218,7 +218,7 @@ func newWorkStatusCommand(settings *Settings) *cobra.Command {
 			out := cmd.OutOrStdout()
 			_, _ = fmt.Fprintf(out, "attempt %s (%s) on intent %s: %s\n", shortID(attempt.ID), attempt.Status, shortID(intent.ID), intent.Title)
 			_, _ = fmt.Fprintf(out, "scope    allow %s (mode %s)%s\n", strings.Join(intent.Scope.Allow, ", "), intent.Scope.Mode, denyClause(intent.Scope.Deny))
-			_, _ = fmt.Fprintf(out, "world    %s   %d operation(s) logged\n", shortWorld(attempt.World), len(ops))
+			_, _ = fmt.Fprintf(out, "world    %s   %d operation(s) logged\n", attempt.World.Short(), len(ops))
 			if len(verdicts) == 0 {
 				_, err = fmt.Fprintln(out, "working tree: no changes to submit")
 				return err
@@ -284,7 +284,7 @@ func newWorkSubmitCommand(settings *Settings) *cobra.Command {
 				return err
 			}
 			if len(changes) == 0 {
-				return fmt.Errorf("nothing to submit: the working tree has no changes")
+				return errors.New("nothing to submit: the working tree has no changes")
 			}
 
 			// All or nothing: refuse the whole submission if the scope forbids any path.
@@ -364,7 +364,7 @@ func readCapped(path string, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("not a regular file")
+		return nil, errors.New("not a regular file")
 	}
 	if info.Size() > limit {
 		return nil, fmt.Errorf("%d bytes is over the %d byte limit", info.Size(), limit)
