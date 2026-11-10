@@ -37,7 +37,7 @@ jobs:
           ./dist/build-check/meiosisd -version | grep -q "^meiosisd " && test "$(./dist/build-check/meiosisd -version)" = "meiosisd ${GITHUB_REF_NAME}"
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/mei-linux-amd64.tar.gz
