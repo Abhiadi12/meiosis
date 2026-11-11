@@ -36,11 +36,10 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # Pull requests opened with the default GITHUB_TOKEN do not start CI, so
-          # the release PR would sit with no checks. A token from a PAT or a
-          # GitHub App (secret RELEASE_PLEASE_TOKEN) fixes that; without one this
-          # still works, but run the checks by hand before merging the PR.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # The workflow's own token. Pull requests it opens do not start CI, so the
+          # release PR shows no checks; CI already ran on main, which is what the
+          # release PR is built from.
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   # A tag created with GITHUB_TOKEN does not trigger the tag-push workflow, so the
   # build is called from here instead.

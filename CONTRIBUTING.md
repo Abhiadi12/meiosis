@@ -70,11 +70,10 @@ How it runs (`.github/workflows/release-please.yml`):
 
 Use a squash merge into `main`, so each change is one clean Conventional Commit.
 
-One-time repository settings: *Settings, Actions, General, Workflow permissions*:
-tick "Allow GitHub Actions to create and approve pull requests". Optionally add a
-secret `RELEASE_PLEASE_TOKEN` (a personal access token or GitHub App token with
-contents and pull-request write access) so that CI runs on the release pull
-request; without it, run the checks by hand before merging it.
+One-time repository setting: *Settings, Actions, General, Workflow permissions*:
+tick "Allow GitHub Actions to create and approve pull requests". The release pull
+request is opened with the workflow's own token, so GitHub does not run CI on it;
+CI has already run on `main`, which is what it is built from.
 
 An emergency release is still possible: push a `vX.Y.Z` tag on a commit that is on
 `main`, and `release.yml` builds and publishes it.
