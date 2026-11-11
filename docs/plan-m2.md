@@ -1,9 +1,8 @@
 # M2 plan: evidence that expires
 
-**Status of this document.** No `docs/plan-m2.md` existed in the repository, on any
-branch, or on the machine, so this plan is derived from the SRS (§6, §8, §10, §11)
-and from what M1 actually left in the code. If you have your own, share it and
-I will reconcile the two rather than overwrite either.
+**Status of this document.** Draft for review on `feat/m2`. Derived from the SRS
+(§6, §8, §10, §11) and from what M1 actually left in the code. Section 3 breaks
+down the core of M2, footprints and automatic invalidation, into components.
 
 **Exit criterion (SRS §10).** *A merged change flips from `verified` to `stale`
 on its own when an unrelated commit changes its footprint, and the UI shows why.*
@@ -37,7 +36,8 @@ Not required by M2's exit, but they bite it: FR-1.2 stored objects are not
 re-verified on read; FR-2.3 to FR-2.6 workspace fork, operation log and undo;
 FR-2.4 attempts cannot start from a git branch; SSH; signed-commit checks;
 **no benchmarks**, while §11.2 says every NFR in §7.1/§7.2 needs one that fails
-the build. Section 5 says which of these M2 takes on.
+the build. The optional carry-overs at the end of section 4 say which of these
+M2 takes on.
 
 ## 2. Decisions to make before building (with a recommendation each)
 
@@ -111,7 +111,138 @@ manifests now, behind a `WorldIndex` interface, so zygote/vfs replaces the
 implementation, not the callers.** Digests are BLAKE3 of file content, the same
 ones the world hash already uses.
 
-## 3. Phases
+## 3. Core components: footprints and automatic invalidation
+
+This is the part of M2 that makes evidence expire (FR-4.6, 4.7, 4.10, 4.11). It
+spans Phases 1, 2 and 5 below; this section names the components, what each owns,
+and what already exists, so the phases can be split into issues.
+
+### 3.1 The idea in one example
+
+```
+evidence E: kind=test-run, outcome=pass, world=W1, footprint=["internal/auth/**"]
+main moves W1 → W2 → W3
+changes(W1, W3) = { internal/auth/token.go (modified), README.md (modified) }
+footprint ∩ changes = { internal/auth/token.go }   ⇒ E is stale, reason: token.go, first changed in W2's ref update
+```
+
+If only `README.md` had changed, E would be *carried*: its world is old, but
+nothing it depends on differs, so it still counts. Nothing is re-executed in
+either case.
+
+### 3.2 Data flow
+
+```
+ git push ──► pushhook ──► RefUpdate{World, BaseWorld} ──► C1 WorldIndex (manifest per world)
+                                                                 │
+ evidence submit ──► C2 Footprint parser ──► Evidence.Footprint  │
+   (CLI / MCP / adapters C3)        (normalised, signed)         ▼
+                                                     C4 ChangeSet = Diff(manifest(E.World), manifest(current))
+                                                                 │
+                                         C5 Standing engine (pure): fresh | carried | stale | expired | superseded
+                                                                 │      + reasons [{path, change, ref_update}]
+                                    C6 Footprint index (fan-out) ┤
+                                                                 ▼
+                                C7 Surfaces: mei attempt show · mei status · evidence_query · policy input (Phase 3)
+```
+
+### 3.3 Components
+
+| # | Component | Owns | Exists today | To build |
+|---|---|---|---|---|
+| C1 | **WorldIndex** | For any world hash, its manifest (path → BLAKE3 digest) | Attempt worlds store a manifest under `KindWorld` (`internal/graph/attempt.go`). Ref updates store only `World`/`BaseWorld` hashes (`pkg/spec/v1/ref_update.go`). | One interface for both kinds; manifests for pushed trees (Phase 1.1, 1.2) |
+| C2 | **Footprint parser** | Turning `[]string` into typed, validated, canonical entries | `Evidence.Footprint []string` is stored and scope-checked at submit (`internal/mcp/tools_evidence.go`); there is no syntax beyond "a string" | `ParseFootprint` (see 3.4) |
+| C3 | **Footprint sources** | Where footprints come from, per adapter | Adapters in `internal/evidence` (JUnit, `go test -json`, SARIF, Cobertura/LCOV, CycloneDX); none sets a footprint | Coverage → measured files; SARIF → files with results; `go test -json` → package directories (approximate, see 3.6); `--footprint` / MCP `footprint` for the rest |
+| C4 | **ChangeSet** | Added / modified / deleted paths between two worlds | `changedPaths(before, after)` in `internal/graph/attempt.go`; `worlds.Diff` over in-memory trees | `Diff(a, b manifest) ChangeSet` with change kind per path, reused by C5 and the review diff |
+| C5 | **Standing engine** | Classifying one evidence record against the current world | Two copies of a world-equality check: `graph.QueryEvidence` (`internal/graph/diff.go`) and `evidenceStanding` (`internal/cli/evidence_submit.go`) | One pure function, `Standing(e, current, changes, now) → (State, []Reason)`; both copies call it |
+| C6 | **Footprint index** | Path → evidence IDs, for fan-out when a ref moves (SRS §4.4, NFR-1.4) | None | Built only if C5-on-read misses NFR-1.4 (see 3.5) |
+| C7 | **Surfaces** | Showing standing and *why* | `mei attempt show` prints STALE/SUPERSEDED; `evidence_query` filters `counted/stale/superseded` | Add `carried` and `expired`, print reasons; feed `fresh`/`carried` into the policy input (Phase 3.2) |
+
+### 3.4 Footprint syntax and parsing (C2)
+
+Evidence is signed, so the footprint is normalised **before** signing; two
+submissions with the same meaning produce the same bytes.
+
+| Entry | Example | Meaning | M2 |
+|---|---|---|---|
+| Exact path | `internal/auth/token.go` | that file | accepted |
+| Glob | `internal/auth/**`, `cmd/*/main.go` | any matching file (doublestar, as `internal/scope`) | accepted |
+| Symbol | `sym:internal/auth.Verify` | an exported symbol | reserved, **rejected** with a pointer to M3 |
+| Empty list | `[]` | whole world: stale on any change (M1 behaviour) | accepted |
+
+Rules for `ParseFootprint`:
+
+1. Same path validation as scope: relative, slash-separated, no `..`, no leading
+   `/`, no empty segments. Reuse `internal/scope`'s validator; do not write a
+   fourth one.
+2. Globs must compile (`doublestar.ValidatePattern`).
+3. Sort and de-duplicate. Drop entries covered by another (`a/**` covers `a/b.go`).
+4. Cap the count (proposal: 1,000 entries) so one record cannot make every
+   standing computation expensive.
+5. A deleted or renamed footprint path counts as changed. Renames are a delete
+   plus an add; M2 does not track them.
+
+### 3.5 Standing rules (C5)
+
+Evaluated in this order; the first match wins.
+
+| State | Condition | Counts toward policy? |
+|---|---|---|
+| `superseded` | a later record by the same producer supersedes it (FR-4.12) | no |
+| `expired` | `expires_at` is set and `now > expires_at` (FR-4.11), whatever the code did | no |
+| `fresh` | `e.World == current` | yes |
+| `stale` | footprint empty and `e.World != current`, **or** any footprint entry matches a path in `ChangeSet(e.World, current)` | no |
+| `carried` | world differs, but no footprint entry matches any changed path | yes |
+
+Properties the tests must hold:
+
+- **Pure:** no clock, no I/O. `now` and the manifests are arguments.
+- **Sound:** never `carried` when a footprint file's digest differs (Phase 2.2 property test).
+- **Explained:** every `stale` has at least one reason `{path, change}`. Phase 5 adds which ref update first changed it, by walking ref updates oldest first.
+- **Cost:** O(|changes| × |footprint|) glob matches per record. Compute on read
+  first; build C6 only if the NFR-1.4 benchmark (under 200 ms per attempt) fails.
+  C6 keys exact paths directly and globs by their literal prefix (`internal/auth/`
+  for `internal/auth/**`).
+
+### 3.6 Footprint quality
+
+A footprint that is too small makes `carried` a lie, which is worse than no M2.
+Rules:
+
+- Adapters only emit a footprint when the report itself names the files
+  (coverage, SARIF). Otherwise the footprint stays empty (whole-world) unless the
+  submitter supplies one.
+- A `go test -json` package footprint (`internal/auth/*`) misses transitive
+  dependencies. It is opt-in (`--footprint-from-packages`) and recorded as
+  approximate in the payload, not the default.
+- Should a footprint be allowed outside the attempt's scope? Tests legitimately
+  depend on code the attempt did not change. Today they are refused (open question 7, section 7).
+
+### 3.7 Order and size
+
+Estimates are for one contributor who is new to Go and to this codebase. Each
+step includes understanding the code it touches and writing its spec, building
+it, and testing it, including review rounds.
+
+| Step | Component | Depends on | Understand + spec | Build | Test + review | Days |
+|---|---|---|---|---|---|---|
+| 1 | C2 `ParseFootprint` + wire into submit paths | nothing | 1 | 0.5 | 0.5 | 2 |
+| 2 | C5 `Standing`, pure, with table tests; replace both existing copies | C2 | 1 | 0.5 | 0.5 | 2 |
+| 3 | C4 `Diff` over manifests | C1 for pushed worlds; attempt worlds work today | 0.5 | 0.5 | 0.5 | 1.5 |
+| 4 | C1 manifests for ref updates | Phase 1.2 | 1.5 | 1 | 1 | 3.5 |
+| 5 | Soundness property test (Phase 2.2) | C2, C4, C5 | 0.5 | 0.5 | 0.5 | 1.5 |
+| 6 | C3 coverage/SARIF footprints, `--footprint`, `--ttl` | C2 | 1 | 0.5 | 0.5 | 2 |
+| 7 | C7 surfaces with reasons | C5 | 0.5 | 0.25 | 0.25 | 1 |
+| 8 | C6 index, only if the benchmark needs it | C5, benchmark | 0.5 | 0.5 | 0.5 | 1.5 |
+| | **Total** | | | | | **15 (13.5 without step 8)** |
+
+Calendar time also depends on review turnaround and on the answer to question 7
+(section 7), which step 1 needs.
+
+Steps 1 and 2 need nothing from Phase 1 and can start immediately; they work for
+attempt worlds today, which already have manifests.
+
+## 4. Phases
 
 Sizes are working days for one engineer, as for M1. The SRS allows about 25.
 
@@ -278,7 +409,7 @@ FR-2.7 garbage collection (a "should"); FR-2.3 to FR-2.6 workspace fork, operati
 log and `mei op undo` (M1 "musts" that are still open); SSH transport;
 signed-commit verification for strict mode; CycloneDX XML.
 
-## 4. Order and parallelism
+## 5. Order and parallelism
 
 ```
 P0 ──► P1 ──► P2 ──► P5 ──► P6 ──► P9
@@ -293,7 +424,7 @@ P7 (blocked on D4) joins at P9 if unblocked
 - P8 depends only on the registry, so it can run in parallel from the start of P2.
 - P6's JSON API can start as soon as P4's verdicts exist.
 
-## 5. Risks
+## 6. Risks
 
 | Risk | Mitigation |
 |---|---|
@@ -305,7 +436,7 @@ P7 (blocked on D4) joins at P9 if unblocked
 | The protected-ref gate surprises solo users | Off by default; the default policy is conservative but protection is opt-in |
 | Server-signed and token-based records are weaker than self-signed ones | Documented in the spec; the registry in P8 lets the verifier state exactly what a signature proves |
 
-## 6. Questions for you
+## 7. Questions for you
 
 1. **Policy engine:** OPA behind an interface (my recommendation), or Starlark?
 2. **Merge:** verdict plus protected refs (A), or should the server create the commit (B)?
@@ -313,4 +444,4 @@ P7 (blocked on D4) joins at P9 if unblocked
 4. **zygote:** can you share the repository or its API? Without it Phase 7 stays a stub.
 5. **Human override:** may a human approve over a policy `reject`? I propose not.
 6. **M1 leftovers:** do FR-2.3 to FR-2.6 (workspace fork, operation log, undo) go into M2, or wait?
-7. **docs/plan-m2.md:** is there an existing plan I should reconcile this with?
+7. **Footprint meaning:** does a footprint list the files evidence *touched* or the files it *depends on*? Today `authorizeEvidence` (`internal/mcp/tools_evidence.go`) checks every footprint path against the token's write scope, so an agent allowed only `internal/auth/**` cannot declare that its tests also depend on `pkg/crypto/**`. That pushes footprints to be smaller than the truth, and a change to `pkg/crypto` would then leave the evidence `carried` instead of `stale`. Proposal: footprint means *depends on* (FR-4.6); scope limits writes, not dependencies, so footprint paths are validated (C2) but not scope-checked.
