@@ -3,17 +3,23 @@ name: CI
 on:
   schedule:
     - cron: "17 6 * * 1"
+  # One run per change, not two: a pull request is tested when it is opened or
+  # updated, and a push is tested only when it lands on main (the branch that
+  # releases are cut from). Pushing to dev or a feature branch runs nothing
+  # until its pull request does.
   push:
-    branches: [ main, dev ]  # feature branches are covered by their pull request
+    branches: [ main ]
   pull_request:
     branches: [ main, dev ]
 
 permissions:
   contents: read
 
+# A newer push to the same pull request replaces its older run. Runs on main are
+# never cancelled: every commit that lands there gets a full, finished result.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   hygiene:

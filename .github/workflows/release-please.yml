@@ -1,0 +1,54 @@
+name: Release
+
+# Versioning and tagging are automatic, driven by Conventional Commits on main:
+#
+#   feat   -> minor bump (while 0.x; a breaking change also bumps minor)
+#   fix    -> patch bump
+#   others -> no release on their own
+#
+# release-please keeps ONE open "release" pull request that collects the next
+# version number and the CHANGELOG. Merging that pull request creates the tag and
+# the GitHub Release, and the build job below attaches the binaries.
+on:
+  push:
+    branches: [ main ]
+
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # create the tag and the GitHub Release, update CHANGELOG.md
+      pull-requests: write   # open and update the release pull request
+      issues: write          # release-please labels the pull request ("autorelease: pending")
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # Pull requests opened with the default GITHUB_TOKEN do not start CI, so
+          # the release PR would sit with no checks. A token from a PAT or a
+          # GitHub App (secret RELEASE_PLEASE_TOKEN) fixes that; without one this
+          # still works, but run the checks by hand before merging the PR.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+  # A tag created with GITHUB_TOKEN does not trigger the tag-push workflow, so the
+  # build is called from here instead.
+  build:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
+    permissions:
+      contents: write

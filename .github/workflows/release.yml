@@ -1,6 +1,15 @@
 name: release
 
+# Builds the binaries for a tag and attaches them to its GitHub Release. Normally
+# called by release-please.yml after the release pull request is merged. Pushing
+# a v* tag by hand also works, for a manual or emergency release.
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The tag to build, for example v0.1.0
+        required: true
+        type: string
   push:
     tags:
       - "v*"
@@ -11,8 +20,21 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      # A hand-pushed tag must point at a commit that is on main: releases are
+      # only ever cut from reviewed code.
+      - name: Tag is on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$(git rev-parse HEAD)" origin/main \
+            || { echo "::error::tag $TAG is not on main"; exit 1; }
 
       - uses: actions/setup-go@v7
         with:
@@ -22,7 +44,7 @@ jobs:
         run: go test ./...
 
       - name: Build release artifacts
-        run: bash scripts/release.sh "$GITHUB_REF_NAME"
+        run: bash scripts/release.sh "$TAG"
 
       - name: Include installer in release
         run: |
@@ -33,12 +55,18 @@ jobs:
         run: |
           mkdir -p dist/build-check
           tar xzf dist/mei-linux-amd64.tar.gz --strip-components=1 -C dist/build-check
-          test "$(./dist/build-check/mei version)" = "mei ${GITHUB_REF_NAME}"
-          ./dist/build-check/meiosisd -version | grep -q "^meiosisd " && test "$(./dist/build-check/meiosisd -version)" = "meiosisd ${GITHUB_REF_NAME}"
+          test "$(./dist/build-check/mei version)" = "mei ${TAG}"
+          test "$(./dist/build-check/meiosisd -version)" = "meiosisd ${TAG}"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ env.TAG }}
+          # Before 1.0 the format and the commands may still change.
+          prerelease: ${{ startsWith(env.TAG, 'v0.') }}
+          # release-please writes the notes from the CHANGELOG; only a hand-pushed
+          # tag, which has none, asks GitHub to generate them.
+          generate_release_notes: ${{ github.event_name == 'push' }}
           files: |
             dist/mei-linux-amd64.tar.gz
             dist/mei-linux-arm64.tar.gz
@@ -49,4 +77,3 @@ jobs:
             dist/SHA256SUMS.txt
             dist/install.sh
             dist/install.ps1
-          generate_release_notes: true

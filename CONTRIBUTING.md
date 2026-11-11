@@ -46,6 +46,39 @@ request.
 4. **Push your branch**: `git push origin feature/your-feature-name`
 5. **Open a Pull Request** against the `main` branch. Ensure you fill out the provided PR template.
 
+## Releases
+
+Releases are automatic; nobody tags by hand. The version comes from the commit
+messages on `main` (Conventional Commits):
+
+| commit type | effect (while the version is 0.x) |
+|---|---|
+| `feat` | minor bump: 0.1.0 to 0.2.0 |
+| `fix`, `perf` | patch bump: 0.1.0 to 0.1.1 |
+| breaking change (`feat!:` or a `BREAKING CHANGE:` footer) | minor bump before 1.0, major after |
+| `docs`, `refactor`, `chore`, `ci`, `test`, `build`, `style` | no release by themselves |
+
+How it runs (`.github/workflows/release-please.yml`):
+
+1. Every push to `main` updates one open pull request titled
+   `chore(main): release X.Y.Z`. It holds the next version number and the
+   `CHANGELOG.md` entry.
+2. **Merging that pull request is the release.** It creates the tag `vX.Y.Z` and
+   the GitHub Release, then builds the binaries for Linux, macOS and Windows
+   (amd64 and arm64) with checksums and installers, and attaches them.
+3. Releases below 1.0 are marked as pre-releases.
+
+Use a squash merge into `main`, so each change is one clean Conventional Commit.
+
+One-time repository settings: *Settings, Actions, General, Workflow permissions*:
+tick "Allow GitHub Actions to create and approve pull requests". Optionally add a
+secret `RELEASE_PLEASE_TOKEN` (a personal access token or GitHub App token with
+contents and pull-request write access) so that CI runs on the release pull
+request; without it, run the checks by hand before merging it.
+
+An emergency release is still possible: push a `vX.Y.Z` tag on a commit that is on
+`main`, and `release.yml` builds and publishes it.
+
 ## Issues
 
 If you find a bug or have a feature request, please check the existing issues first. Issues tagged `good first issue` are real ones, not busywork. If it hasn't been reported, open a new issue using the appropriate template.
