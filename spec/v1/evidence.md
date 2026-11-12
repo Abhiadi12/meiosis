@@ -17,7 +17,7 @@
 - `supersedes` (String, optional): the `id` of an earlier evidence record this one corrects (FR-4.12). *(Added in v1; optional.)*
 - `independent` (Boolean, optional): `true` when `producer != Attempt.author` (see Validation Rules). Computed by the server at submission and stored with the record; a client-supplied value that disagrees with the computed one is rejected. Omitted from the encoding when `false`. *(Added in v1; optional, so existing objects remain valid.)*
 - `outcome` (String, required): The result. Allowed values: `"pass"`, `"fail"`, `"inconclusive"`.
-- `footprint` (Array of String, optional): The explicit set of paths or symbols this evidence depends on.
+- `footprint` (Array of String, optional): The explicit set of paths or symbols this evidence depends on. Each entry is a clean repository-relative path or a doublestar glob (`internal/auth/**`). Symbol entries (`sym:...`) are reserved and rejected for now. The server normalises the list before signing: sorted, without duplicates, and without exact paths already matched by a glob in the list; at most 1,000 entries. An empty or absent footprint means the evidence depends on the whole world.
 - `payload` (JSON, required): Kind-specific data (e.g., test coverage percentages, linter output).
 - `expires_at` (Timestamp, optional): A TTL after which the evidence expires regardless of footprint (FR-4.11).
 - `created_at` (Timestamp, required): ISO8601 timestamp.

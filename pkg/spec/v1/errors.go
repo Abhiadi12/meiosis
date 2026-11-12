@@ -10,6 +10,7 @@ var (
 	ErrInvalidPrincipal       = errors.New("invalid principal")
 	ErrInvalidAttempt         = errors.New("invalid attempt")
 	ErrInvalidEvidence        = errors.New("invalid evidence")
+	ErrInvalidFootprint       = errors.New("invalid footprint")
 	ErrInvalidAttestation     = errors.New("invalid attestation")
 	ErrInvalidVerdict         = errors.New("invalid verdict")
 	ErrInvalidCapabilityToken = errors.New("invalid capability token")

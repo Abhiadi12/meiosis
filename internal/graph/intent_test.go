@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -248,6 +249,54 @@ func TestSubmitEvidenceThenGetEvidenceRoundTrips(t *testing.T) {
 	}
 	if fetched.ID != created.ID || fetched.Attempt != created.Attempt {
 		t.Fatalf("GetEvidence() = %+v, want %+v", fetched, created)
+	}
+}
+
+func TestSubmitEvidenceNormalisesFootprint(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+	keys, _ := crypto.GenerateKeyPair()
+	putTestAttempt(t, store, "agent:author")
+
+	params := evidenceParams("agent:ci-runner")
+	params.Footprint = []string{"pkg/b.go", "internal/auth/**", "internal/auth/token.go", "pkg/b.go"}
+	created, err := store.SubmitEvidence(ctx, params, keys.PrivateKey)
+	if err != nil {
+		t.Fatalf("SubmitEvidence() error = %v", err)
+	}
+	want := []string{"internal/auth/**", "pkg/b.go"}
+	stored, err := store.GetEvidence(ctx, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(stored.Footprint, ",") != strings.Join(want, ",") {
+		t.Fatalf("stored footprint = %q, want %q", stored.Footprint, want)
+	}
+	// The signature covers the normalised footprint, not the submitted one.
+	if ok, verr := crypto.Verify(stored, stored.Signature, keys.PublicKey); verr != nil || !ok {
+		t.Fatalf("crypto.Verify() = %v, %v, want true, nil", ok, verr)
+	}
+}
+
+func TestSubmitEvidenceRejectsInvalidFootprint(t *testing.T) {
+	store := newTestStore(t)
+	keys, _ := crypto.GenerateKeyPair()
+	putTestAttempt(t, store, "agent:author")
+
+	for _, entry := range []string{"internal/[bad", "../outside.go", "sym:pkg.Verify"} {
+		params := evidenceParams("agent:ci-runner")
+		params.Footprint = []string{entry}
+		_, err := store.SubmitEvidence(context.Background(), params, keys.PrivateKey)
+		if !errors.Is(err, graph.ErrInvalidParams) || !errors.Is(err, specv1.ErrInvalidFootprint) {
+			t.Fatalf("SubmitEvidence(footprint %q) error = %v, want ErrInvalidParams and ErrInvalidFootprint", entry, err)
+		}
+	}
+	records, err := store.ListEvidence(context.Background(), testAttemptID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("rejected submissions stored %d records", len(records))
 	}
 }
 
