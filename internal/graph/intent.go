@@ -158,9 +158,9 @@ func (s *Store) SubmitEvidence(ctx context.Context, p SubmitEvidenceParams, sign
 	// Every submit path (MCP evidence_submit and evidence_ingest, mei evidence
 	// submit) ends here, so this is the one place footprints are checked. It
 	// runs before signing: the signed bytes carry the normalised footprint.
-	footprint, err := specv1.ParseFootprint(p.Footprint)
-	if err != nil {
-		return specv1.Evidence{}, fmt.Errorf("%w: %w", ErrInvalidParams, err)
+	footprint, fpErr := specv1.ParseFootprint(p.Footprint)
+	if fpErr != nil {
+		return specv1.Evidence{}, fmt.Errorf("%w: %w", ErrInvalidParams, fpErr)
 	}
 	evidence := specv1.Evidence{
 		Attempt:    p.Attempt,
@@ -183,7 +183,7 @@ func (s *Store) SubmitEvidence(ctx context.Context, p SubmitEvidenceParams, sign
 		return specv1.Evidence{}, fmt.Errorf("%w: %w", ErrInvalidParams, err)
 	}
 
-	err = s.backend.Transaction(ctx, func(tx storage.Tx) error {
+	err := s.backend.Transaction(ctx, func(tx storage.Tx) error {
 		attempt, err := loadActiveAttempt(ctx, tx, p.Attempt)
 		if err != nil {
 			return err

@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -42,7 +43,7 @@ func ParseFootprint(entries []string) ([]string, error) {
 	var globs, paths []string
 	for i, entry := range entries {
 		if err := checkFootprintEntry(entry); err != nil {
-			return nil, fmt.Errorf("%w: entry %d %q: %s", ErrInvalidFootprint, i, entry, err)
+			return nil, fmt.Errorf("%w: entry %d %q: %w", ErrInvalidFootprint, i, entry, err)
 		}
 		if seen[entry] {
 			continue
@@ -70,11 +71,11 @@ func ParseFootprint(entries []string) ([]string, error) {
 func checkFootprintEntry(entry string) error {
 	switch {
 	case strings.HasPrefix(entry, SymbolFootprintPrefix):
-		return fmt.Errorf("symbol footprints are reserved for a later version; list the files or globs instead")
+		return errors.New("symbol footprints are reserved for a later version; list the files or globs instead")
 	case !ValidRepoPath(entry):
-		return fmt.Errorf("must be a clean, relative, slash-separated path inside the repository")
+		return errors.New("must be a clean, relative, slash-separated path inside the repository")
 	case !doublestar.ValidatePattern(entry):
-		return fmt.Errorf("is not a valid glob pattern")
+		return errors.New("is not a valid glob pattern")
 	}
 	return nil
 }
